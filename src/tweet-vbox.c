@@ -44,26 +44,12 @@
 
 #include "tweet-animation.h"
 #include "tweet-config.h"
-#include "tweet-preferences.h"
 #include "tweet-spinner.h"
 #include "tweet-status-info.h"
 #include "tweet-status-model.h"
 #include "tweet-status-view.h"
 #include "tweet-utils.h"
 #include "tweet-vbox.h"
-
-typedef enum {
-  TWEET_VBOX_RECENT,
-  TWEET_VBOX_REPLIES,
-  TWEET_VBOX_ARCHIVE,
-  TWEET_VBOX_FAVORITES
-} TweetVBoxMode;
-
-#define CANVAS_WIDTH    350
-#define CANVAS_HEIGHT   500
-#define CANVAS_PADDING  6
-
-#define WINDOW_WIDTH    (CANVAS_WIDTH + (2 * CANVAS_PADDING))
 
 #define TWEET_VBOX_GET_PRIVATE(obj)   (G_TYPE_INSTANCE_GET_PRIVATE ((obj), TWEET_TYPE_VBOX, TweetVBoxPrivate))
 
@@ -89,10 +75,6 @@ struct _TweetVBoxPrivate
   gint press_row;
   guint in_press : 1;
 
-  guint refresh_id;
-
-  TweetVBoxMode mode;
-
 #ifdef HAVE_NM_GLIB
   libnm_glib_ctx *nm_context;
   guint nm_id;
@@ -105,12 +87,13 @@ G_DEFINE_TYPE (TweetVBox, tweet_vbox, GTK_TYPE_VBOX);
 static void
 tweet_vbox_dispose (GObject *gobject)
 {
-  TweetVBoxPrivate *priv = TWEET_VBOX (gobject)->priv;
+  TweetVBox *vbox = TWEET_VBOX (gobject);
+  TweetVBoxPrivate *priv = vbox->priv;
 
-  if (priv->refresh_id)
+  if (vbox->refresh_id)
     {
-      g_source_remove (priv->refresh_id);
-      priv->refresh_id = 0;
+      g_source_remove (vbox->refresh_id);
+      vbox->refresh_id = 0;
     }
 
   if (priv->client)
@@ -144,9 +127,9 @@ static void
 on_status_received (TwitterClient *client,
                     TwitterStatus *status,
                     const GError  *error,
-                    TweetVBox   *window)
+                    TweetVBox   *vbox)
 {
-  TweetVBoxPrivate *priv = window->priv;
+  TweetVBoxPrivate *priv = vbox->priv;
 
   if (error)
     {
@@ -158,14 +141,14 @@ on_status_received (TwitterClient *client,
       g_warning ("Unable to retrieve status from Twitter: %s", error->message);
     }
   else
-    tweet_status_model_prepend_status (window->priv->status_model, status);
+    tweet_status_model_prepend_status (vbox->priv->status_model, status);
 }
 
 static void
 on_timeline_complete (TwitterClient *client,
-                      TweetVBox   *window)
+                      TweetVBox   *vbox)
 {
-  TweetVBoxPrivate *priv = window->priv;
+  TweetVBoxPrivate *priv = vbox->priv;
 
   tweet_spinner_stop (TWEET_SPINNER (priv->spinner));
   tweet_actor_animate (priv->spinner, TWEET_LINEAR, 500,
@@ -175,9 +158,9 @@ on_timeline_complete (TwitterClient *client,
 
 static void
 on_entry_changed (GtkEntry *entry,
-                  TweetVBox *window)
+                  TweetVBox *vbox)
 {
-  TweetVBoxPrivate *priv = window->priv;
+  TweetVBoxPrivate *priv = vbox->priv;
   const gchar *status_text = gtk_entry_get_text (entry);
   const gchar *color;
   gchar *count_text;
@@ -209,9 +192,9 @@ on_entry_changed (GtkEntry *entry,
 
 static void
 on_entry_activate (GtkEntry *entry,
-                   TweetVBox *window)
+                   TweetVBox *vbox)
 {
-  TweetVBoxPrivate *priv = window->priv;
+  TweetVBoxPrivate *priv = vbox->priv;
   const gchar *text;
 
   text = gtk_entry_get_text (entry);
@@ -225,18 +208,18 @@ on_entry_activate (GtkEntry *entry,
 
 static void
 on_info_destroy (TweetAnimation *animation,
-                 TweetVBox    *window)
+                 TweetVBox    *vbox)
 {
-  clutter_actor_destroy (window->priv->info);
-  window->priv->info = NULL;
+  clutter_actor_destroy (vbox->priv->info);
+  vbox->priv->info = NULL;
 }
 
 static gboolean
 on_info_button_press (ClutterActor       *actor,
                       ClutterButtonEvent *event,
-                      TweetVBox        *window)
+                      TweetVBox        *vbox)
 {
-  TweetVBoxPrivate *priv = window->priv;
+  TweetVBoxPrivate *priv = vbox->priv;
   TweetAnimation *animation;
 
   animation =
@@ -245,7 +228,7 @@ on_info_button_press (ClutterActor       *actor,
                          NULL);
   g_signal_connect (animation,
                     "completed", G_CALLBACK (on_info_destroy),
-                    window);
+                    vbox);
 
   clutter_actor_set_reactive (priv->status_view, TRUE);
   tweet_actor_animate (priv->status_view, TWEET_LINEAR, 250,
@@ -257,9 +240,9 @@ on_info_button_press (ClutterActor       *actor,
 
 static void
 on_star_clicked (TweetStatusInfo *info,
-                 TweetVBox     *window)
+                 TweetVBox     *vbox)
 {
-  TweetVBoxPrivate *priv = window->priv;
+  TweetVBoxPrivate *priv = vbox->priv;
   TwitterStatus *status;
 
   status = tweet_status_info_get_status (info);
@@ -271,9 +254,9 @@ on_star_clicked (TweetStatusInfo *info,
 
 static void
 on_reply_clicked (TweetStatusInfo *info,
-                  TweetVBox     *window)
+                  TweetVBox     *vbox)
 {
-  TweetVBoxPrivate *priv = window->priv;
+  TweetVBoxPrivate *priv = vbox->priv;
   TwitterStatus *status;
   TwitterUser *user;
   gchar *reply_to;
@@ -296,18 +279,18 @@ on_reply_clicked (TweetStatusInfo *info,
 
 static void
 on_status_info_visible (TweetAnimation *animation,
-                        TweetVBox    *window)
+                        TweetVBox    *vbox)
 {
-  window->priv->in_press = FALSE;
-  clutter_actor_set_reactive (window->priv->info, TRUE);
+  vbox->priv->in_press = FALSE;
+  clutter_actor_set_reactive (vbox->priv->info, TRUE);
 }
 
 static gboolean
 on_status_view_button_press (ClutterActor       *actor,
                              ClutterButtonEvent *event,
-                             TweetVBox        *window)
+                             TweetVBox        *vbox)
 {
-  TweetVBoxPrivate *priv = window->priv;
+  TweetVBoxPrivate *priv = vbox->priv;
   gint row;
 
   /* this should not happen, but just in case... */
@@ -333,9 +316,9 @@ on_status_view_button_press (ClutterActor       *actor,
 static gboolean
 on_status_view_button_release (ClutterActor       *actor,
                                ClutterButtonEvent *event,
-                               TweetVBox        *window)
+                               TweetVBox        *vbox)
 {
-  TweetVBoxPrivate *priv = window->priv;
+  TweetVBoxPrivate *priv = vbox->priv;
 
 /* in case of a crappy touchscreen */
 #define JITTER  5
@@ -384,19 +367,19 @@ on_status_view_button_release (ClutterActor       *actor,
       tweet_overlay_set_color (TWEET_OVERLAY (priv->info), &info_color);
       g_signal_connect (priv->info,
                         "button-press-event", G_CALLBACK (on_info_button_press),
-                        window);
+                        vbox);
       g_signal_connect (priv->info,
                         "star-clicked", G_CALLBACK (on_star_clicked),
-                        window);
+                        vbox);
       g_signal_connect (priv->info,
                         "reply-clicked", G_CALLBACK (on_reply_clicked),
-                        window);
+                        vbox);
                                 
       clutter_container_add_actor (CLUTTER_CONTAINER (stage), priv->info);
       clutter_actor_set_position (priv->info,
-                                  geometry.x + CANVAS_PADDING,
-                                  geometry.y + CANVAS_PADDING);
-      clutter_actor_set_size (priv->info, geometry.width - CANVAS_PADDING, 16);
+                                  geometry.x + TWEET_CANVAS_PADDING,
+                                  geometry.y + TWEET_CANVAS_PADDING);
+      clutter_actor_set_size (priv->info, geometry.width - TWEET_CANVAS_PADDING, 16);
       clutter_actor_set_opacity (priv->info, 0);
       clutter_actor_set_reactive (priv->info, FALSE);
       clutter_actor_show (priv->info);
@@ -406,13 +389,13 @@ on_status_view_button_release (ClutterActor       *actor,
        */
       animation =
         tweet_actor_animate (priv->info, TWEET_LINEAR, 250,
-                             "y", tweet_interval_new (G_TYPE_INT, geometry.y + CANVAS_PADDING, 100 + CANVAS_PADDING),
-                             "height", tweet_interval_new (G_TYPE_INT, 16, (CANVAS_HEIGHT - (100 * 2))),
+                             "y", tweet_interval_new (G_TYPE_INT, geometry.y + TWEET_CANVAS_PADDING, 100 + TWEET_CANVAS_PADDING),
+                             "height", tweet_interval_new (G_TYPE_INT, 16, (TWEET_CANVAS_HEIGHT - (100 * 2))),
                              "opacity", tweet_interval_new (G_TYPE_UCHAR, 0, 224),
                              NULL);
       g_signal_connect (animation,
                         "completed", G_CALLBACK (on_status_info_visible),
-                        window);
+                        vbox);
 
       /* set the status view as not reactive to avoid opening
        * the status info on double tap
@@ -432,18 +415,18 @@ on_status_view_button_release (ClutterActor       *actor,
 }
 
 static inline void
-tweet_vbox_clear (TweetVBox *window)
+tweet_vbox_clear (TweetVBox *vbox)
 {
-  TweetVBoxPrivate *priv = window->priv;
+  TweetVBoxPrivate *priv = vbox->priv;
 
   tidy_list_view_set_model (TIDY_LIST_VIEW (priv->status_view), NULL);
   g_object_unref (priv->status_model);
 }
 
-static inline void
-tweet_vbox_refresh (TweetVBox *window)
+inline void
+tweet_vbox_refresh (TweetVBox *vbox)
 {
-  TweetVBoxPrivate *priv = window->priv;
+  TweetVBoxPrivate *priv = vbox->priv;
 
   tidy_list_view_set_model (TIDY_LIST_VIEW (priv->status_view), NULL);
   g_object_unref (priv->status_model);
@@ -458,32 +441,30 @@ tweet_vbox_refresh (TweetVBox *window)
                        "opacity", tweet_interval_new (G_TYPE_UCHAR, 0, 127),
                        NULL);
 
-  switch (priv->mode)
+  switch (vbox->mode)
     {
-    case TWEET_VBOX_RECENT:
+    case TWEET_MODE_RECENT:
       twitter_client_get_user_timeline (priv->client, NULL, 0, NULL);
       break;
 
-    case TWEET_VBOX_REPLIES:
+    case TWEET_MODE_REPLIES:
       twitter_client_get_replies (priv->client);
       break;
 
-    case TWEET_VBOX_ARCHIVE:
+    case TWEET_MODE_ARCHIVE:
       break;
 
-    case TWEET_VBOX_FAVORITES:
+    case TWEET_MODE_FAVORITES:
       twitter_client_get_favorites (priv->client, NULL, 0);
       break;
     }
 
 }
 
-static gboolean
-refresh_timeout (gpointer data)
+gboolean
+tweet_vbox_refresh_timeout (TweetVBox *vbox)
 {
-  TweetVBox *window = data;
-
-  tweet_vbox_refresh (window);
+  tweet_vbox_refresh (vbox);
 
   return TRUE;
 }
@@ -493,8 +474,8 @@ static void
 nm_context_callback (libnm_glib_ctx *libnm_ctx,
                      gpointer        user_data)
 {
-  TweetVBox *window = user_data;
-  TweetVBoxPrivate *priv = window->priv;
+  TweetVBox *vbox = user_data;
+  TweetVBoxPrivate *priv = vbox->priv;
   libnm_glib_state nm_state;
   gint refresh_time;
 
@@ -510,16 +491,16 @@ nm_context_callback (libnm_glib_ctx *libnm_ctx,
 
       if (refresh_time > 0)
         {
-          if (priv->refresh_id)
+          if (vbox->refresh_id)
             break;
 
-          tweet_vbox_refresh (window);
-          priv->refresh_id = g_timeout_add_seconds (refresh_time,
-                                                    refresh_timeout,
-                                                    window);
+          tweet_vbox_refresh (vbox);
+          vbox->refresh_id = g_timeout_add_seconds (refresh_time,
+                                                    tweet_vbox_refresh_timeout,
+                                                    vbox);
         }
       else
-        tweet_vbox_refresh (window);
+        tweet_vbox_refresh (vbox);
 
       break;
 
@@ -529,9 +510,9 @@ nm_context_callback (libnm_glib_ctx *libnm_ctx,
       break;
 
     case LIBNM_NO_NETWORK_CONNECTION:
-      g_source_remove (priv->refresh_id);
-      priv->refresh_id = 0;
-      tweet_vbox_clear (window);
+      g_source_remove (vbox->refresh_id);
+      vbox->refresh_id = 0;
+      tweet_vbox_clear (vbox);
       break;
 
     case LIBNM_INVALID_CONTEXT:
@@ -546,8 +527,8 @@ nm_context_callback (libnm_glib_ctx *libnm_ctx,
 static void
 tweet_vbox_constructed (GObject *gobject)
 {
-  TweetVBox *window = TWEET_VBOX (gobject);
-  TweetVBoxPrivate *priv = window->priv;
+  TweetVBox *vbox = TWEET_VBOX (gobject);
+  TweetVBoxPrivate *priv = vbox->priv;
   ClutterActor *stage;
   ClutterActor *img;
 #ifdef HAVE_NM_GLIB
@@ -556,7 +537,7 @@ tweet_vbox_constructed (GObject *gobject)
 
   stage = gtk_clutter_embed_get_stage (GTK_CLUTTER_EMBED (priv->canvas));
 
-  img = tweet_texture_new_from_stock (GTK_WIDGET (window),
+  img = tweet_texture_new_from_stock (GTK_WIDGET (vbox),
                                       GTK_STOCK_REFRESH,
                                       GTK_ICON_SIZE_DIALOG);
   if (!img)
@@ -568,15 +549,15 @@ tweet_vbox_constructed (GObject *gobject)
   clutter_actor_set_size (priv->spinner, 128, 128);
   clutter_actor_set_anchor_point (priv->spinner, 64, 64);
   clutter_actor_set_position (priv->spinner,
-                              WINDOW_WIDTH / 2,
-                              CANVAS_HEIGHT / 2);
+                              TWEET_VBOX_WIDTH / 2,
+                              TWEET_CANVAS_HEIGHT / 2);
   clutter_actor_show (priv->spinner);
   tweet_spinner_start (TWEET_SPINNER (priv->spinner));
   tweet_actor_animate (priv->spinner, TWEET_LINEAR, 500,
                        "opacity", tweet_interval_new (G_TYPE_UCHAR, 0, 127),
                        NULL);
 
-  gtk_widget_show_all (GTK_WIDGET (window));
+  gtk_widget_show_all (GTK_WIDGET (vbox));
 
 #ifdef HAVE_NM_GLIB
   priv->nm_context = libnm_glib_init ();
@@ -590,9 +571,9 @@ tweet_vbox_constructed (GObject *gobject)
 
       refresh_time = tweet_config_get_refresh_time (priv->config);
       if (refresh_time > 0)
-        priv->refresh_id = g_timeout_add_seconds (refresh_time,
-                                                  refresh_timeout,
-                                                  window);
+        vbox->refresh_id = g_timeout_add_seconds (refresh_time,
+                                                  tweet_vbox_refresh_timeout,
+                                                  vbox);
     }
   else
     {
@@ -605,16 +586,16 @@ tweet_vbox_constructed (GObject *gobject)
   priv->nm_state = nm_state;
   priv->nm_id = libnm_glib_register_callback (priv->nm_context,
                                               nm_context_callback,
-                                              window,
+                                              vbox,
                                               NULL);
 #else
   twitter_client_get_user_timeline (priv->client, NULL, 0, NULL);
 
   if (tweet_config_get_refresh_time (priv->config) > 0)
-    priv->refresh_id =
+    vbox->refresh_id =
       g_timeout_add_seconds (tweet_config_get_refresh_time (priv->config),
-                             refresh_timeout,
-                             window);
+                             (GSourceFunc)tweet_vbox_refresh_timeout,
+                             vbox);
 #endif /* HAVE_NM_GLIB */
 }
 
@@ -680,7 +661,7 @@ tweet_vbox_init (TweetVBox *vbox)
 
   vbox->priv = priv = TWEET_VBOX_GET_PRIVATE (vbox);
 
-  priv->mode = TWEET_VBOX_RECENT;
+  vbox->mode = TWEET_MODE_RECENT;
 
   priv->status_model = TWEET_STATUS_MODEL (tweet_status_model_new ());
 
@@ -701,18 +682,18 @@ tweet_vbox_init (TweetVBox *vbox)
 
   priv->canvas = gtk_clutter_embed_new ();
   gtk_widget_set_size_request (priv->canvas,
-                               CANVAS_WIDTH + CANVAS_PADDING,
-                               CANVAS_HEIGHT + CANVAS_PADDING);
+                               TWEET_CANVAS_WIDTH + TWEET_CANVAS_PADDING,
+                               TWEET_CANVAS_HEIGHT + TWEET_CANVAS_PADDING);
   gtk_container_add (GTK_CONTAINER (frame), priv->canvas);
 
   stage = gtk_clutter_embed_get_stage (GTK_CLUTTER_EMBED (priv->canvas));
   gtk_widget_set_size_request (priv->canvas,
-                               CANVAS_WIDTH + CANVAS_PADDING,
-                               CANVAS_HEIGHT + CANVAS_PADDING);
+                               TWEET_CANVAS_WIDTH + TWEET_CANVAS_PADDING,
+                               TWEET_CANVAS_HEIGHT + TWEET_CANVAS_PADDING);
   clutter_stage_set_color (CLUTTER_STAGE (stage), &stage_color);
   clutter_actor_set_size (stage,
-                          CANVAS_WIDTH + CANVAS_PADDING,
-                          CANVAS_HEIGHT + CANVAS_PADDING);
+                          TWEET_CANVAS_WIDTH + TWEET_CANVAS_PADDING,
+                          TWEET_CANVAS_HEIGHT + TWEET_CANVAS_PADDING);
 
   view = tweet_status_view_new (priv->status_model);
   g_signal_connect (view,
@@ -727,8 +708,8 @@ tweet_vbox_init (TweetVBox *vbox)
   clutter_actor_set_reactive (view, TRUE);
   priv->status_view = view;
 
-  clutter_actor_set_size (priv->scroll, CANVAS_WIDTH, CANVAS_HEIGHT);
-  clutter_actor_set_position (priv->scroll, CANVAS_PADDING, CANVAS_PADDING);
+  clutter_actor_set_size (priv->scroll, TWEET_CANVAS_WIDTH, TWEET_CANVAS_HEIGHT);
+  clutter_actor_set_position (priv->scroll, TWEET_CANVAS_PADDING, TWEET_CANVAS_PADDING);
   clutter_container_add_actor (CLUTTER_CONTAINER (stage), priv->scroll);
   clutter_actor_set_reactive (priv->scroll, TRUE);
   clutter_actor_show (priv->scroll);
@@ -764,12 +745,22 @@ tweet_vbox_init (TweetVBox *vbox)
                             "clicked", G_CALLBACK (gtk_widget_activate),
                             priv->entry);
   priv->send_button = button;
-
-  gtk_widget_realize (priv->canvas);
 }
 
 GtkWidget *
 tweet_vbox_new (void)
 {
   return g_object_new (TWEET_TYPE_VBOX, NULL);
+}
+
+GtkWidget *
+tweet_vbox_get_canvas (TweetVBox *vbox)
+{
+  return TWEET_VBOX_GET_PRIVATE (vbox)->canvas;
+}
+
+TweetConfig *
+tweet_vbox_get_config (TweetVBox *vbox)
+{
+  return TWEET_VBOX_GET_PRIVATE (vbox)->config;
 }

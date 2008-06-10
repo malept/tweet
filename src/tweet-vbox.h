@@ -21,8 +21,22 @@
 #define __TWEET_VBOX_H__
 
 #include <gtk/gtkvbox.h>
+#include "tweet-config.h"
 
 G_BEGIN_DECLS
+
+#define TWEET_CANVAS_WIDTH    350
+#define TWEET_CANVAS_HEIGHT   500
+#define TWEET_CANVAS_PADDING  6
+
+#define TWEET_VBOX_WIDTH    (TWEET_CANVAS_WIDTH + (2 * TWEET_CANVAS_PADDING))
+
+typedef enum {
+  TWEET_MODE_RECENT,
+  TWEET_MODE_REPLIES,
+  TWEET_MODE_ARCHIVE,
+  TWEET_MODE_FAVORITES
+} TweetMode;
 
 #define TWEET_TYPE_VBOX               (tweet_vbox_get_type ())
 #define TWEET_VBOX(obj)               (G_TYPE_CHECK_INSTANCE_CAST ((obj), TWEET_TYPE_VBOX, TweetVBox))
@@ -40,6 +54,10 @@ struct _TweetVBox
   GtkVBox parent_instance;
 
   TweetVBoxPrivate *priv;
+
+  TweetMode mode;
+
+  guint refresh_id;
 };
 
 struct _TweetVBoxClass
@@ -47,8 +65,12 @@ struct _TweetVBoxClass
   GtkVBoxClass parent_class;
 };
 
-GType      tweet_vbox_get_type (void) G_GNUC_CONST;
-GtkWidget *tweet_vbox_new      (void);
+GType        tweet_vbox_get_type        (void) G_GNUC_CONST;
+GtkWidget   *tweet_vbox_new             (void);
+GtkWidget   *tweet_vbox_get_canvas      (TweetVBox *vbox);
+TweetConfig *tweet_vbox_get_config      (TweetVBox *vbox);
+inline void  tweet_vbox_refresh         (TweetVBox *vbox);
+gboolean     tweet_vbox_refresh_timeout (TweetVBox *vbox);
 
 G_END_DECLS
 
