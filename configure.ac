@@ -96,6 +96,18 @@ if test "x$has_nm_glib" = "xyes"; then
   AC_DEFINE([HAVE_NM_GLIB], [1], [Define to 1 if we have NM-GLib support])
 fi
 
+AC_ARG_ENABLE([awn-applet],
+              AC_HELP_STRING([--enable-awn-applet],
+                             [build the Avant Window Navigator applet]),,
+              enable_awn_applet=no)
+
+if test "x$enable_awn_applet" = "xyes"; then
+  PKG_CHECK_MODULES(AWN, [awn >= 0.3.1])
+  AC_SUBST(AWN_CFLAGS)
+  AC_SUBST(AWN_LIBS)
+fi
+AM_CONDITIONAL([BUILD_AWN_APPLET], test "x$enable_awn_applet" = "xyes")
+
 dnl = Enable debug level ===================================================
 
 m4_define([debug_default],

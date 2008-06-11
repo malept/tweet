@@ -28,9 +28,15 @@ common_ldadd = \
 	$(NMGLIB_LIBS) \
 	$(NULL)
 
+if BUILD_AWN_APPLET
+tweet_applet = tweet-applet.la
+endif
 
 noinst_LTLIBRARIES = libtweet-ui.la
 bin_PROGRAMS = tweet
+
+awndir = $(libdir)/awn/applets/tweet
+awn_LTLIBRARIES = $(tweet_applet)
 
 tweet_h = \
 	tweet-animation.h \
@@ -117,6 +123,11 @@ libtweet_ui_la_LIBADD = $(common_ldadd)
 tweet_SOURCES = tweet-main.c
 tweet_CFLAGS = $(common_cflags)
 tweet_LDADD = $(common_ldadd) libtweet-ui.la
+
+tweet_applet_la_SOURCES = tweet-awn-applet.c
+tweet_applet_la_CFLAGS = $(common_cflags) $(AWN_CFLAGS)
+tweet_applet_la_LIBADD = $(AWN_LIBS) libtweet-ui.la
+tweet_applet_la_LDFLAGS = -module -avoid-version
 
 CLEANFILES = stamp-tweet-enum-types.h
 
