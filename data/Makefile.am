@@ -7,11 +7,17 @@ tweetappdir = $(datadir)/applications
 tweetapp_in_files = tweet.desktop.in
 tweetapp_DATA = $(tweetapp_in_files:.desktop.in=.desktop)
 
+if BUILD_AWN_APPLET
+appletdatadir = $(libdir)/awn/applets
+appletdata_in_files = tweet-applet.desktop.in
+appletdata_DATA = $(appletdata_in_files:.desktop.in=.desktop)
+endif
+
 @INTLTOOL_DESKTOP_RULE@
 
-EXTRA_DIST = $(tweetapp_in_files) $(tweetui_DATA)
+EXTRA_DIST = $(tweetapp_in_files) $(tweetui_DATA) tweet-applet.desktop.in.in
 
-CLEANFILES = $(tweetapp_DATA)
+CLEANFILES = $(tweetapp_DATA) $(appletdata_DATA)
 
 gtk_update_icon_cache = gtk-update-icon-cache -f -t $(datadir)/tweet/icons/hicolor
 

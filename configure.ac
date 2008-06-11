@@ -158,6 +158,9 @@ AM_GLIB_GNU_GETTEXT
 dnl gnome-doc-utils stuff
 GNOME_DOC_INIT
 
+dnl miscellaneous
+AS_AC_EXPAND(LIBDIR, "$libdir")
+
 AC_CONFIG_FILES([
         Makefile
         twitter-glib/Makefile
@@ -176,6 +179,7 @@ AC_CONFIG_FILES([
         data/icons/scalable/Makefile
         data/icons/scalable/actions/Makefile
         data/icons/scalable/status/Makefile
+        data/tweet-applet.desktop.in
 ])
 
 AC_OUTPUT

@@ -41,4 +41,6 @@ po/POTFILES
 po/stamp-it
 gnome-doc-utils.make
 data/tweet.desktop
+data/tweet-applet.desktop
+data/tweet-applet.desktop.in
 mkinstalldirs
