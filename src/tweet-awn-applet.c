@@ -147,6 +147,9 @@ awn_applet_factory_initp (const gchar *uid, gint orient, gint height)
 
   theme = gtk_icon_theme_get_default ();
 
+  gtk_icon_theme_append_search_path (theme,
+                                     PKGDATADIR G_DIR_SEPARATOR_S "icons");
+
   tweet = g_malloc (sizeof (TweetAwnApplet));
 
   tweet->applet = AWN_APPLET_SIMPLE (awn_applet_simple_new (uid, orient, height));
