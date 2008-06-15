@@ -27,6 +27,8 @@
 #include <libawn/awn-applet-dialog.h>
 #include <libawn/awn-applet-simple.h>
 
+#include "tweet-auth-dialog.h"
+#include "tweet-config.h"
 #include "tweet-vbox.h"
 
 typedef struct
@@ -38,6 +40,22 @@ typedef struct
   GtkWidget       *menu;
   gboolean         dialog_shown;
 } TweetAwnApplet;
+
+static void
+tweet_applet_create_vbox (TweetAwnApplet *tweet)
+{
+  tweet->dialog = awn_applet_dialog_new (AWN_APPLET (tweet->applet));
+
+  gtk_window_set_default_size (GTK_WINDOW (tweet->dialog), TWEET_VBOX_WIDTH, 600);
+
+  tweet->vbox = tweet_vbox_new ();
+  TWEET_VBOX (tweet->vbox)->mode = TWEET_MODE_RECENT;
+  gtk_widget_set_size_request (tweet->vbox, TWEET_VBOX_WIDTH, 600);
+  gtk_container_add (GTK_CONTAINER (tweet->dialog), tweet->vbox);
+  gtk_widget_show (tweet->vbox);
+
+  gtk_widget_realize (tweet_vbox_get_canvas (TWEET_VBOX (tweet->vbox)));
+}
 
 static gboolean
 tweet_applet_menu_do_refresh (GtkMenuItem *item,
@@ -76,30 +94,67 @@ tweet_applet_onclick (GtkWidget      *applet,
       /* show/hide dialog */
       if (!tweet->dialog) 
       {
-        GtkWidget *vbox;
+        TweetConfig *config;
 
-        tweet->dialog = awn_applet_dialog_new (AWN_APPLET (tweet->applet));
+        config = tweet_config_get_default ();
+        
+        if (tweet_config_get_username (config) &&
+            tweet_config_get_password (config))
+        {
+          /* we already have a user */
 
-        gtk_window_set_default_size (GTK_WINDOW (tweet->dialog), TWEET_VBOX_WIDTH, 600);
+          tweet_applet_create_vbox (tweet);
+        }
+        else
+        {
+          GtkWidget *dialog;
+          gint res;
 
-        tweet->vbox = vbox = tweet_vbox_new ();
-        TWEET_VBOX (vbox)->mode = TWEET_MODE_RECENT;
-        gtk_widget_set_size_request (vbox, TWEET_VBOX_WIDTH, 600);
-        gtk_container_add (GTK_CONTAINER (tweet->dialog), vbox);
-        gtk_widget_show (vbox);
+          dialog = tweet_auth_dialog_new (NULL, "Authentication - Tweet");
+          res = gtk_dialog_run (GTK_DIALOG (dialog));
 
-        gtk_widget_realize (tweet_vbox_get_canvas (TWEET_VBOX (vbox)));
+          switch (res)
+          {
+            case GTK_RESPONSE_OK:
+            {
+              TweetAuthDialog *auth = TWEET_AUTH_DIALOG (dialog);
+              const gchar *username, *password;
+
+              username = tweet_auth_dialog_get_username (auth);
+              password = tweet_auth_dialog_get_password (auth);
+
+              tweet_config_set_username (config, username);
+              tweet_config_set_password (config, password);
+              tweet_config_save (config);
+
+              tweet_applet_create_vbox (tweet);
+            }
+            break;
+
+            case GTK_RESPONSE_CANCEL:
+            case GTK_RESPONSE_DELETE_EVENT:
+              break;
+            default:
+              g_assert_not_reached ();
+              break;
+          }
+
+          gtk_widget_destroy (dialog);
+        }
       }
       
-      if (tweet->dialog_shown)
+      if (tweet->dialog)
       {
-        gtk_widget_hide (tweet->dialog);
+        if (tweet->dialog_shown)
+        {
+          gtk_widget_hide (tweet->dialog);
+        }
+        else /* !tweet->dialog_shown */
+        {
+          gtk_widget_show_all (tweet->dialog);
+        }
+        tweet->dialog_shown = !tweet->dialog_shown;
       }
-      else /* !tweet->dialog_shown */
-      {
-        gtk_widget_show_all (tweet->dialog);
-      }
-      tweet->dialog_shown = !tweet->dialog_shown;
       break; /* }}} */
     case 2: /* {{{ (middle mouse button) */
       /* nothing for now */
