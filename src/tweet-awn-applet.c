@@ -46,11 +46,11 @@ tweet_applet_create_vbox (TweetAwnApplet *tweet)
 {
   tweet->dialog = awn_applet_dialog_new (AWN_APPLET (tweet->applet));
 
-  gtk_window_set_default_size (GTK_WINDOW (tweet->dialog), TWEET_VBOX_WIDTH, 600);
+  gtk_window_set_default_size (GTK_WINDOW (tweet->dialog), TWEET_VBOX_WIDTH, 550);
 
   tweet->vbox = tweet_vbox_new ();
   TWEET_VBOX (tweet->vbox)->mode = TWEET_MODE_RECENT;
-  gtk_widget_set_size_request (tweet->vbox, TWEET_VBOX_WIDTH, 600);
+  gtk_widget_set_size_request (tweet->vbox, TWEET_VBOX_WIDTH, 550);
   gtk_container_add (GTK_CONTAINER (tweet->dialog), tweet->vbox);
   gtk_widget_show (tweet->vbox);
 
