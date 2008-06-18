@@ -68,8 +68,6 @@ struct _TweetVBoxPrivate
   TwitterClient *client;
   TwitterUser *user;
 
-  GTimeVal last_update;
-
   TweetConfig *config;
   TweetStatusModel *status_model;
 
@@ -154,14 +152,23 @@ on_status_received (TwitterClient *client,
       if (error->domain == TWITTER_ERROR &&
           error->code == TWITTER_ERROR_NOT_MODIFIED)
         {
-          g_get_current_time (&priv->last_update);
+          g_get_current_time (&vbox->last_update);
           return;
         }
 
       g_warning ("Unable to retrieve status from Twitter: %s", error->message);
     }
   else
-    tweet_status_model_prepend_status (priv->status_model, status);
+    {
+      if (!priv->status_model)
+        {
+          priv->status_model = TWEET_STATUS_MODEL (tweet_status_model_new ());
+          tidy_list_view_set_model (TIDY_LIST_VIEW (priv->status_view),
+                                    CLUTTER_MODEL (priv->status_model));
+        }
+
+      tweet_status_model_prepend_status (priv->status_model, status);
+    }
 }
 
 static void
@@ -175,7 +182,7 @@ on_timeline_complete (TwitterClient *client,
                        "opacity", tweet_interval_new (G_TYPE_UCHAR, 127, 0),
                        NULL);
 
-  g_get_current_time (&priv->last_update);
+  g_get_current_time (&vbox->last_update);
 }
 
 static void
@@ -436,13 +443,14 @@ on_status_view_button_release (ClutterActor       *actor,
   return FALSE;
 }
 
-static inline void
+inline void
 tweet_vbox_clear (TweetVBox *vbox)
 {
   TweetVBoxPrivate *priv = vbox->priv;
 
   tidy_list_view_set_model (TIDY_LIST_VIEW (priv->status_view), NULL);
   g_object_unref (priv->status_model);
+  priv->status_model = NULL;
 }
 
 inline void
@@ -461,7 +469,7 @@ tweet_vbox_refresh (TweetVBox *vbox)
     case TWEET_MODE_RECENT:
       twitter_client_get_friends_timeline (priv->client,
                                            NULL,
-                                           priv->last_update.tv_sec);
+                                           vbox->last_update.tv_sec);
       break;
 
     case TWEET_MODE_REPLIES:

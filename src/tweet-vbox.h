@@ -57,6 +57,8 @@ struct _TweetVBox
 
   TweetMode mode;
 
+  GTimeVal last_update;
+
   guint refresh_id;
 };
 
@@ -69,6 +71,7 @@ GType        tweet_vbox_get_type        (void) G_GNUC_CONST;
 GtkWidget   *tweet_vbox_new             (void);
 GtkWidget   *tweet_vbox_get_canvas      (TweetVBox *vbox);
 TweetConfig *tweet_vbox_get_config      (TweetVBox *vbox);
+inline void  tweet_vbox_clear           (TweetVBox *vbox);
 inline void  tweet_vbox_refresh         (TweetVBox *vbox);
 gboolean     tweet_vbox_refresh_timeout (TweetVBox *vbox);
 
