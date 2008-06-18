@@ -187,6 +187,8 @@ on_timeline_complete (TwitterClient *client,
 
   /* TODO add libnotify msg of # of new statuses received? */
 
+  vbox->n_status_received = 0;
+
   g_get_current_time (&vbox->last_update);
 }
 

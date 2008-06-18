@@ -16,6 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -153,9 +154,19 @@ on_timeline_complete (TwitterClient *client,
 {
   TweetWindowPrivate *priv = window->priv;
 
-  tweet_window_status_message (window, TWEET_STATUS_RECEIVED,
-                               _("Received %d new statuses"),
-                               TWEET_VBOX (priv->vbox)->n_status_received);
+  if (TWEET_VBOX (priv->vbox)->n_status_received > 0)
+    {
+      gchar *msg;
+
+      msg = g_strdup_printf (ngettext ("Received a new status",
+                                       "Received %d new statuses",
+                                       TWEET_VBOX (priv->vbox)->n_status_received),
+                             TWEET_VBOX (priv->vbox)->n_status_received);
+
+      tweet_window_status_message (window, TWEET_STATUS_RECEIVED, msg);
+
+      g_free (msg);
+    }
 }
 
 static void
