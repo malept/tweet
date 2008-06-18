@@ -88,6 +88,8 @@ on_status_icon_activate (GtkStatusIcon *icon,
                          TweetWindow   *window)
 {
   gtk_window_present (GTK_WINDOW (window));
+
+  gtk_status_icon_set_visible (window->priv->status_icon, FALSE);
 }
 
 static void
@@ -106,9 +108,9 @@ tweet_window_status_message (TweetWindow     *window,
       g_signal_connect (priv->status_icon,
                         "activate", G_CALLBACK (on_status_icon_activate),
                         window);
-
-      gtk_status_icon_set_visible (priv->status_icon, TRUE);
     }
+
+  gtk_status_icon_set_visible (priv->status_icon, TRUE);
 
   va_start (args, format);
   message = g_strdup_vprintf (format, args);
