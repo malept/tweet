@@ -33,12 +33,21 @@
 #include "tweet-vbox.h"
 #include "tweet-window.h"
 
+typedef enum {
+  TWEET_STATUS_ERROR,
+  TWEET_STATUS_RECEIVED,
+  TWEET_STATUS_NO_CONNECTION
+} TweetStatusMode;
+
 #define TWEET_WINDOW_GET_PRIVATE(obj)   (G_TYPE_INSTANCE_GET_PRIVATE ((obj), TWEET_TYPE_WINDOW, TweetWindowPrivate))
 
 struct _TweetWindowPrivate
 {
   GtkWidget *vbox;
   GtkWidget *menubar;
+
+  GtkStatusIcon *status_icon;
+
 
   GtkUIManager *manager;
   GtkActionGroup *action_group;
@@ -57,6 +66,12 @@ tweet_window_dispose (GObject *gobject)
       priv->manager = NULL;
     }
 
+  if (priv->status_icon)
+    {
+      g_object_unref (priv->status_icon);
+      priv->status_icon = NULL;
+    }
+
   if (priv->action_group)
     {
       g_object_unref (priv->action_group);
@@ -64,6 +79,155 @@ tweet_window_dispose (GObject *gobject)
     }
 
   G_OBJECT_CLASS (tweet_window_parent_class)->dispose (gobject);
+}
+
+static void
+on_status_icon_activate (GtkStatusIcon *icon,
+                         TweetWindow   *window)
+{
+  gtk_window_present (GTK_WINDOW (window));
+}
+
+static void
+tweet_window_status_message (TweetWindow     *window,
+                             TweetStatusMode  status_mode,
+                             const gchar     *format,
+                             ...)
+{
+  TweetWindowPrivate *priv = window->priv;
+  va_list args;
+  gchar *message;
+
+  if (!priv->status_icon)
+    {
+      priv->status_icon = gtk_status_icon_new_from_icon_name ("document-send");
+      g_signal_connect (priv->status_icon,
+                        "activate", G_CALLBACK (on_status_icon_activate),
+                        window);
+
+      gtk_status_icon_set_visible (priv->status_icon, TRUE);
+    }
+
+  va_start (args, format);
+  message = g_strdup_vprintf (format, args);
+  va_end (args);
+
+  switch (status_mode)
+    {
+    case TWEET_STATUS_ERROR:
+      gtk_status_icon_set_tooltip (priv->status_icon, message);
+      g_warning (message);
+      break;
+
+    case TWEET_STATUS_RECEIVED:
+    case TWEET_STATUS_NO_CONNECTION:
+      gtk_status_icon_set_tooltip (priv->status_icon, message);
+      g_print (message);
+      g_print ("\n");
+      break;
+    }
+
+  g_free (message);
+}
+
+static void
+on_status_received (TwitterClient *client,
+                    TwitterStatus *status,
+                    const GError  *error,
+                    TweetWindow   *window)
+{
+  if (error)
+    {
+      tweet_window_status_message (window, TWEET_STATUS_ERROR,
+                                   _("Unable to retrieve status from Twitter: %s"),
+                                   error->message);
+    }
+}
+
+static void
+on_timeline_complete (TwitterClient *client,
+                      TweetWindow   *window)
+{
+  TweetWindowPrivate *priv = window->priv;
+
+  tweet_window_status_message (window, TWEET_STATUS_RECEIVED,
+                               _("Received %d new statuses"),
+                               TWEET_VBOX (priv->vbox)->n_status_received);
+}
+
+static void
+on_user_received (TwitterClient *client,
+                  TwitterUser   *user,
+                  const GError  *error,
+                  TweetWindow   *window)
+{
+  if (error)
+    {
+      tweet_window_status_message (window, TWEET_STATUS_ERROR,
+                                   _("Unable to retrieve used `%s': %s"),
+                                   tweet_config_get_username (tweet_config_get_default ()),
+                                   error->message);
+    }
+}
+
+#ifdef HAVE_NM_GLIB
+static void
+nm_context_callback (libnm_glib_ctx *libnm_ctx,
+                     gpointer        user_data)
+{
+  TweetWindow *window = user_data;
+  TweetWindowPrivate *priv = window->priv;
+  libnm_glib_state nm_state;
+
+  nm_state = libnm_glib_get_network_state (libnm_ctx);
+
+  if (nm_state == priv->nm_state)
+    return;
+
+  switch (nm_state)
+    {
+    case LIBNM_NO_NETWORK_CONNECTION:
+      tweet_window_status_message (window, TWEET_STATUS_NO_CONNECTION,
+                                   _("No network connection available"));
+      break;
+
+    case LIBNM_ACTIVE_NETWORK_CONNECTION:
+    case LIBNM_NO_DBUS:
+    case LIBNM_NO_NETWORKMANAGER:
+    case LIBNM_INVALID_CONTEXT:
+      break;
+    }
+}
+#endif /* HAVE_NM_GLIB */
+
+static void
+tweet_window_constructed (GObject *gobject)
+{
+#ifdef HAVE_NM_GLIB
+  TweetWindow *window = TWEET_WINDOW (gobject);
+  TweetWindowPrivate *priv = window->priv;
+  libnm_glib_state nm_state;
+
+  priv->nm_context = libnm_glib_init ();
+
+  nm_state = libnm_glib_get_network_state (priv->nm_context);
+  if (nm_state == LIBNM_ACTIVE_NETWORK_CONNECTION)
+    {
+      const gchar *email_address;
+
+      g_signal_connect (TWEET_VBOX (priv->vbox)->client,
+                        "user-received", G_CALLBACK (on_user_received),
+                        window);
+
+      email_address = tweet_config_get_username (priv->config);
+      twitter_client_show_user_from_email (priv->client, email_address);
+    }
+  else
+    {
+      tweet_window_status_message (window, TWEET_STATUS_NO_CONNECTION,
+                                   _("No network connection available"));
+    }
+#endif /* HAVE_NM_GLIB */
 }
 
 static void
@@ -191,7 +355,7 @@ about_url_hook (GtkAboutDialog *dialog,
                        &pid, &error);
   if (error)
     {
-      g_warning ("Unable to launch xdg-open: %s", error->message);
+      g_critical ("Unable to launch xdg-open: %s", error->message);
       g_error_free (error);
     }
 
@@ -231,6 +395,7 @@ tweet_window_class_init (TweetWindowClass *klass)
 
   g_type_class_add_private (klass, sizeof (TweetWindowPrivate));
 
+  gobject_class->constructed = tweet_window_constructed;
   gobject_class->dispose = tweet_window_dispose;
 }
 
@@ -299,6 +464,14 @@ tweet_window_init (TweetWindow *window)
 
   TWEET_VBOX (priv->vbox)->mode = TWEET_MODE_RECENT;
 
+  g_signal_connect (TWEET_VBOX (priv->vbox)->client,
+                    "status-received", G_CALLBACK (on_status_received),
+                    window);
+
+  g_signal_connect (TWEET_VBOX (priv->vbox)->client,
+                    "timeline-complete", G_CALLBACK (on_timeline_complete),
+                    window);
+
   priv->action_group = gtk_action_group_new ("TweetActions");
   gtk_action_group_set_translation_domain (priv->action_group, NULL);
   gtk_action_group_add_actions (priv->action_group,
@@ -319,8 +492,7 @@ tweet_window_init (TweetWindow *window)
                                         PKGDATADIR G_DIR_SEPARATOR_S "tweet.ui",
                                         &error))
     {
-     g_critical ("Building menus failed: %s",
-                 error->message);
+     g_critical ("Building menus failed: %s", error->message);
      g_error_free (error);
     }
   else

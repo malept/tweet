@@ -65,7 +65,6 @@ struct _TweetVBoxPrivate
   ClutterActor *scroll;
   ClutterActor *info;
 
-  TwitterClient *client;
   TwitterUser *user;
 
   TweetConfig *config;
@@ -103,11 +102,11 @@ tweet_vbox_dispose (GObject *gobject)
       priv->user = NULL;
     }
 
-  if (priv->client)
+  if (vbox->client)
     {
-      twitter_client_end_session (priv->client);
-      g_object_unref (priv->client);
-      priv->client = NULL;
+      twitter_client_end_session (vbox->client);
+      g_object_unref (vbox->client);
+      vbox->client = NULL;
     }
 
   if (priv->status_model)
@@ -156,6 +155,9 @@ on_status_received (TwitterClient *client,
           return;
         }
 
+      vbox->n_status_received = 0;
+
+      /* TODO change into libnotify msg? */
       g_warning ("Unable to retrieve status from Twitter: %s", error->message);
     }
   else
@@ -167,7 +169,8 @@ on_status_received (TwitterClient *client,
                                     CLUTTER_MODEL (priv->status_model));
         }
 
-      tweet_status_model_prepend_status (priv->status_model, status);
+      if (tweet_status_model_prepend_status (priv->status_model, status));
+        vbox->n_status_received += 1;
     }
 }
 
@@ -181,6 +184,8 @@ on_timeline_complete (TwitterClient *client,
   tweet_actor_animate (priv->spinner, TWEET_LINEAR, 500,
                        "opacity", tweet_interval_new (G_TYPE_UCHAR, 127, 0),
                        NULL);
+
+  /* TODO add libnotify msg of # of new statuses received? */
 
   g_get_current_time (&vbox->last_update);
 }
@@ -223,14 +228,13 @@ static void
 on_entry_activate (GtkEntry *entry,
                    TweetVBox *vbox)
 {
-  TweetVBoxPrivate *priv = vbox->priv;
   const gchar *text;
 
   text = gtk_entry_get_text (entry);
   if (!text || *text == '\0')
     return;
 
-  twitter_client_add_status (priv->client, text);
+  twitter_client_add_status (vbox->client, text);
 
   gtk_entry_set_text (entry, "");
 }
@@ -271,14 +275,13 @@ static void
 on_star_clicked (TweetStatusInfo *info,
                  TweetVBox     *vbox)
 {
-  TweetVBoxPrivate *priv = vbox->priv;
   TwitterStatus *status;
 
   status = tweet_status_info_get_status (info);
   if (!status)
     return;
 
-  twitter_client_add_favorite (priv->client, twitter_status_get_id (status));
+  twitter_client_add_favorite (vbox->client, twitter_status_get_id (status));
 }
 
 static void
@@ -467,24 +470,25 @@ tweet_vbox_refresh (TweetVBox *vbox)
   switch (vbox->mode)
     {
     case TWEET_MODE_RECENT:
-      twitter_client_get_friends_timeline (priv->client,
+      vbox->n_status_received = 0;
+      twitter_client_get_friends_timeline (vbox->client,
                                            NULL,
                                            vbox->last_update.tv_sec);
       break;
 
     case TWEET_MODE_REPLIES:
-      twitter_client_get_replies (priv->client);
+      twitter_client_get_replies (vbox->client);
       break;
 
     case TWEET_MODE_ARCHIVE:
-      twitter_client_get_user_timeline (priv->client,
+      twitter_client_get_user_timeline (vbox->client,
                                         NULL,
                                         0,
                                         vbox->last_update.tv_sec);
       break;
 
     case TWEET_MODE_FAVORITES:
-      twitter_client_get_favorites (priv->client, NULL, 0);
+      twitter_client_get_favorites (vbox->client, NULL, 0);
       break;
     }
 
@@ -496,7 +500,9 @@ tweet_vbox_refresh_timeout (TweetVBox *vbox)
   tweet_vbox_refresh (vbox);
 
   return TRUE;
-}static void
+}
+
+static void
 on_user_received (TwitterClient *client,
                   TwitterUser   *user,
                   const GError  *error,
@@ -508,6 +514,7 @@ on_user_received (TwitterClient *client,
   if (error)
     {
       priv->user = NULL;
+      /* TODO change into libnotify msg? */
       g_warning ("Unable to retrieve user `%s': %s",
                  tweet_config_get_username (priv->config),
                  error->message);
@@ -517,7 +524,7 @@ on_user_received (TwitterClient *client,
   /* keep a reference on ourselves */
   priv->user = g_object_ref (user);
 
-  twitter_client_get_friends_timeline (priv->client, NULL, 0);
+  twitter_client_get_friends_timeline (vbox->client, NULL, 0);
 
   refresh_time = tweet_config_get_refresh_time (priv->config);
   if (refresh_time > 0)
@@ -625,12 +632,12 @@ tweet_vbox_constructed (GObject *gobject)
     {
       const gchar *email_address;
 
-      g_signal_connect (priv->client,
+      g_signal_connect (vbox->client,
                         "user-received", G_CALLBACK (on_user_received),
                         vbox);
 
       email_address = tweet_config_get_username (priv->config);
-      twitter_client_show_user_from_email (priv->client, email_address);
+      twitter_client_show_user_from_email (vbox->client, email_address);
     }
   else
     {
@@ -646,7 +653,7 @@ tweet_vbox_constructed (GObject *gobject)
                                               vbox,
                                               NULL);
 #else
-  twitter_client_get_friends_timeline (priv->client, NULL, 0);
+  twitter_client_get_friends_timeline (vbox->client, NULL, 0);
 
   if (tweet_config_get_refresh_time (priv->config) > 0)
     vbox->refresh_id =
@@ -723,12 +730,12 @@ tweet_vbox_init (TweetVBox *vbox)
   priv->status_model = TWEET_STATUS_MODEL (tweet_status_model_new ());
 
   priv->config = tweet_config_get_default ();
-  priv->client = twitter_client_new_for_user (tweet_config_get_username (priv->config),
+  vbox->client = twitter_client_new_for_user (tweet_config_get_username (priv->config),
                                               tweet_config_get_password (priv->config));
-  g_signal_connect (priv->client,
+  g_signal_connect (vbox->client,
                     "status-received", G_CALLBACK (on_status_received),
                     vbox);
-  g_signal_connect (priv->client,
+  g_signal_connect (vbox->client,
                     "timeline-complete", G_CALLBACK (on_timeline_complete),
                     vbox);
 

@@ -21,6 +21,7 @@
 #define __TWEET_VBOX_H__
 
 #include <gtk/gtkvbox.h>
+#include "twitter-client.h"
 #include "tweet-config.h"
 
 G_BEGIN_DECLS
@@ -55,9 +56,12 @@ struct _TweetVBox
 
   TweetVBoxPrivate *priv;
 
+  TwitterClient *client;
   TweetMode mode;
 
   GTimeVal last_update;
+
+  gint n_status_received;
 
   guint refresh_id;
 };
