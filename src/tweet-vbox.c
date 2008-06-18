@@ -66,6 +66,9 @@ struct _TweetVBoxPrivate
   ClutterActor *info;
 
   TwitterClient *client;
+  TwitterUser *user;
+
+  GTimeVal last_update;
 
   TweetConfig *config;
   TweetStatusModel *status_model;
@@ -94,6 +97,12 @@ tweet_vbox_dispose (GObject *gobject)
     {
       g_source_remove (vbox->refresh_id);
       vbox->refresh_id = 0;
+    }
+
+  if (priv->user)
+    {
+      g_object_unref (priv->user);
+      priv->user = NULL;
     }
 
   if (priv->client)
@@ -138,10 +147,21 @@ on_status_received (TwitterClient *client,
                            "opacity", tweet_interval_new (G_TYPE_UCHAR, 127, 0),
                            NULL);
 
+      /* if the content was not modified since the last update,
+       * silently ignore the error; Twitter-GLib still emits it
+       * so that clients can notify the user anyway
+       */
+      if (error->domain == TWITTER_ERROR &&
+          error->code == TWITTER_ERROR_NOT_MODIFIED)
+        {
+          g_get_current_time (&priv->last_update);
+          return;
+        }
+
       g_warning ("Unable to retrieve status from Twitter: %s", error->message);
     }
   else
-    tweet_status_model_prepend_status (vbox->priv->status_model, status);
+    tweet_status_model_prepend_status (priv->status_model, status);
 }
 
 static void
@@ -154,6 +174,8 @@ on_timeline_complete (TwitterClient *client,
   tweet_actor_animate (priv->spinner, TWEET_LINEAR, 500,
                        "opacity", tweet_interval_new (G_TYPE_UCHAR, 127, 0),
                        NULL);
+
+  g_get_current_time (&priv->last_update);
 }
 
 static void
@@ -428,13 +450,6 @@ tweet_vbox_refresh (TweetVBox *vbox)
 {
   TweetVBoxPrivate *priv = vbox->priv;
 
-  tidy_list_view_set_model (TIDY_LIST_VIEW (priv->status_view), NULL);
-  g_object_unref (priv->status_model);
-
-  priv->status_model = TWEET_STATUS_MODEL (tweet_status_model_new ());
-  tidy_list_view_set_model (TIDY_LIST_VIEW (priv->status_view),
-                            CLUTTER_MODEL (priv->status_model));
-
   clutter_actor_show (priv->spinner);
   tweet_spinner_start (TWEET_SPINNER (priv->spinner));
   tweet_actor_animate (priv->spinner, TWEET_LINEAR, 500,
@@ -444,7 +459,10 @@ tweet_vbox_refresh (TweetVBox *vbox)
   switch (vbox->mode)
     {
     case TWEET_MODE_RECENT:
-      twitter_client_get_user_timeline (priv->client, NULL, 0, NULL);
+      twitter_client_get_user_timeline (priv->client,
+                                        NULL,
+                                        0,
+                                        priv->last_update.tv_sec);
       break;
 
     case TWEET_MODE_REPLIES:
@@ -467,7 +485,36 @@ tweet_vbox_refresh_timeout (TweetVBox *vbox)
   tweet_vbox_refresh (vbox);
 
   return TRUE;
+}static void
+on_user_received (TwitterClient *client,
+                  TwitterUser   *user,
+                  const GError  *error,
+                  TweetVBox     *vbox)
+{
+  TweetVBoxPrivate *priv = vbox->priv;
+  gint refresh_time;
+
+  if (error)
+    {
+      priv->user = NULL;
+      g_warning ("Unable to retrieve user `%s': %s",
+                 tweet_config_get_username (priv->config),
+                 error->message);
+      return;
+    }
+
+  /* keep a reference on ourselves */
+  priv->user = g_object_ref (user);
+
+  twitter_client_get_user_timeline (priv->client, NULL, 0, 0);
+
+  refresh_time = tweet_config_get_refresh_time (priv->config);
+  if (refresh_time > 0)
+    vbox->refresh_id = g_timeout_add_seconds (refresh_time,
+                                              (GSourceFunc)tweet_vbox_refresh_timeout,
+                                              vbox);
 }
+
 
 #ifdef HAVE_NM_GLIB
 static void
@@ -565,15 +612,14 @@ tweet_vbox_constructed (GObject *gobject)
   nm_state = libnm_glib_get_network_state (priv->nm_context);
   if (nm_state == LIBNM_ACTIVE_NETWORK_CONNECTION)
     {
-      gint refresh_time;
+      const gchar *email_address;
 
-      twitter_client_get_user_timeline (priv->client, NULL, 0, NULL);
+      g_signal_connect (priv->client,
+                        "user-received", G_CALLBACK (on_user_received),
+                        vbox);
 
-      refresh_time = tweet_config_get_refresh_time (priv->config);
-      if (refresh_time > 0)
-        vbox->refresh_id = g_timeout_add_seconds (refresh_time,
-                                                  tweet_vbox_refresh_timeout,
-                                                  vbox);
+      email_address = tweet_config_get_username (priv->config);
+      twitter_client_show_user_from_email (priv->client, email_address);
     }
   else
     {
@@ -589,7 +635,7 @@ tweet_vbox_constructed (GObject *gobject)
                                               vbox,
                                               NULL);
 #else
-  twitter_client_get_user_timeline (priv->client, NULL, 0, NULL);
+  twitter_client_get_user_timeline (priv->client, NULL, 0, 0);
 
   if (tweet_config_get_refresh_time (priv->config) > 0)
     vbox->refresh_id =
