@@ -477,6 +477,10 @@ tweet_vbox_refresh (TweetVBox *vbox)
       break;
 
     case TWEET_MODE_ARCHIVE:
+      twitter_client_get_user_timeline (priv->client,
+                                        NULL,
+                                        0,
+                                        vbox->last_update.tv_sec);
       break;
 
     case TWEET_MODE_FAVORITES:
