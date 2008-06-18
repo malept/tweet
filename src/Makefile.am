@@ -131,4 +131,6 @@ tweet_applet_la_LDFLAGS = -module -avoid-version
 
 CLEANFILES = stamp-tweet-enum-types.h
 
+DISTCLEANFILES = tweet-enum-types.h tweet-enum-types.c
+
 EXTRA_DIST = tweet-enum-types.c.in tweet-enum-types.h.in
