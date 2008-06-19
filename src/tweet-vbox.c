@@ -469,6 +469,11 @@ tweet_vbox_refresh (TweetVBox *vbox)
                        "opacity", tweet_interval_new (G_TYPE_UCHAR, 0, 127),
                        NULL);
 
+  /* check for the user */
+  if (!priv->user)
+    twitter_client_show_user_from_email (vbox->client,
+                                         tweet_config_get_username (priv->config));
+
   switch (vbox->mode)
     {
     case TWEET_MODE_RECENT:
@@ -511,7 +516,6 @@ on_user_received (TwitterClient *client,
                   TweetVBox     *vbox)
 {
   TweetVBoxPrivate *priv = vbox->priv;
-  gint refresh_time;
 
   if (error)
     {
@@ -523,18 +527,12 @@ on_user_received (TwitterClient *client,
       return;
     }
 
+  if (priv->user)
+    g_object_unref (priv->user);
+
   /* keep a reference on ourselves */
   priv->user = g_object_ref (user);
-
-  twitter_client_get_friends_timeline (vbox->client, NULL, 0);
-
-  refresh_time = tweet_config_get_refresh_time (priv->config);
-  if (refresh_time > 0)
-    vbox->refresh_id = g_timeout_add_seconds (refresh_time,
-                                              (GSourceFunc)tweet_vbox_refresh_timeout,
-                                              vbox);
 }
-
 
 #ifdef HAVE_NM_GLIB
 static void
@@ -633,6 +631,7 @@ tweet_vbox_constructed (GObject *gobject)
   if (nm_state == LIBNM_ACTIVE_NETWORK_CONNECTION)
     {
       const gchar *email_address;
+      gint refresh_time;
 
       g_signal_connect (vbox->client,
                         "user-received", G_CALLBACK (on_user_received),
@@ -640,6 +639,14 @@ tweet_vbox_constructed (GObject *gobject)
 
       email_address = tweet_config_get_username (priv->config);
       twitter_client_show_user_from_email (vbox->client, email_address);
+
+      twitter_client_get_friends_timeline (vbox->client, NULL, 0);
+
+      refresh_time = tweet_config_get_refresh_time (priv->config);
+      if (refresh_time > 0)
+        vbox->refresh_id = g_timeout_add_seconds (refresh_time,
+                                                  (GSourceFunc)tweet_vbox_refresh_timeout,
+                                                  vbox);
     }
   else
     {
