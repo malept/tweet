@@ -328,7 +328,7 @@ append_row_layout (TidyListView     *view,
   gint i;
   GList *l;
 
-  h_padding = default_h_padding; 
+  h_padding = default_h_padding;
   v_padding = default_v_padding;
 
   tidy_stylable_get (TIDY_STYLABLE (view),
@@ -606,7 +606,7 @@ ensure_layout (TidyListView *view)
   if (priv->rows)
     return;
 
-  h_padding = default_h_padding; 
+  h_padding = default_h_padding;
   v_padding = default_v_padding;
 
   tidy_stylable_get (TIDY_STYLABLE (view),
@@ -1043,7 +1043,7 @@ tidy_list_view_paint (ClutterActor *actor)
   ClutterUnit h_paddingu, v_paddingu;
   gboolean has_clip;
 
-  h_padding = default_h_padding; 
+  h_padding = default_h_padding;
   v_padding = default_v_padding;
 
   tidy_stylable_get (TIDY_STYLABLE (actor),
@@ -1190,6 +1190,112 @@ tidy_list_view_scroll (ClutterActor       *actor,
 }
 
 static gboolean
+tidy_list_view_key_press (ClutterActor    *actor,
+                          ClutterKeyEvent *event)
+{
+  TidyListView *list_view = TIDY_LIST_VIEW (actor);
+  TidyListViewPrivate *priv = list_view->priv;
+  ClutterFixed value;
+  ClutterFixed lower, upper;
+  ClutterFixed page_increment;
+  gint n_visible_rows;
+  ClutterUnit page_height;
+  ClutterUnit x, y, width, height;
+  guint h_padding, v_padding;
+  ClutterUnit h_paddingu, v_paddingu;
+  gboolean has_clip;
+  GList *l;
+
+  if (!priv->vadjustment)
+    return FALSE;
+
+  tidy_adjustment_get_valuesx (priv->vadjustment,
+                               &value,
+                               &lower, &upper,
+                               NULL,
+                               &page_increment,
+                               NULL);
+
+
+  h_padding = default_h_padding;
+  v_padding = default_v_padding;
+
+  tidy_stylable_get (TIDY_STYLABLE (actor),
+                     "h-padding", &h_padding,
+                     "v-padding", &v_padding,
+                     NULL);
+
+  h_paddingu = CLUTTER_UNITS_FROM_DEVICE (h_padding);
+  v_paddingu = CLUTTER_UNITS_FROM_DEVICE (v_padding);
+
+  /* Check clipping rectangle to compute the visible rows */
+  if ((has_clip = clutter_actor_has_clip (actor)))
+    clutter_actor_get_clipu (actor, &x, &y, &width, &height);
+  else
+    {
+      x = y = width = height = 0;
+
+      page_height = 0;
+    }
+
+  y += CLUTTER_UNITS_FROM_FIXED (value);
+
+  /* rows painted first first */
+  for (l = priv->rows; l != NULL; l = l->next)
+    {
+      ListRow *row = l->data;
+      ClutterUnit row_offset = row->y_offset;
+      ClutterUnit row_height = row->height;
+
+      /* leading rows */
+      if (has_clip && ((row_offset + row_height + v_paddingu) < y))
+        continue;
+
+      /* trailing rows */
+      if (has_clip && ((row_offset - v_paddingu / 2) > y + height))
+        break;;
+
+      n_visible_rows += 1;
+      page_height += row_height;
+    }
+
+  switch (event->keyval)
+    {
+    case CLUTTER_Home:
+    case CLUTTER_KP_Home:
+      value = 0;
+      break;
+
+    case CLUTTER_Page_Up:
+    case CLUTTER_KP_Page_Up:
+      value -= page_height;
+      value = MAX (lower, value);
+      break;
+
+    case CLUTTER_Page_Down:
+    case CLUTTER_KP_Page_Down:
+      value += page_height;
+      value = MIN (upper, value);
+      break;
+
+    case CLUTTER_End:
+    case CLUTTER_KP_End:
+      value = upper;
+      break;
+
+    default:
+      return FALSE;
+    }
+
+  tidy_adjustment_set_valuex (priv->vadjustment, value);
+
+  if (CLUTTER_ACTOR_IS_VISIBLE (actor))
+    clutter_actor_queue_redraw (actor);
+
+  return TRUE;
+}
+
+static gboolean
 tidy_list_view_button_press (ClutterActor       *actor,
                              ClutterButtonEvent *event)
 {
@@ -1245,6 +1351,7 @@ tidy_list_view_class_init (TidyListViewClass *klass)
   actor_class->paint = tidy_list_view_paint;
   actor_class->button_press_event = tidy_list_view_button_press;
   actor_class->scroll_event = tidy_list_view_scroll;
+  actor_class->key_press_event = tidy_list_view_key_press;
 
   g_object_class_install_property (gobject_class,
                                    PROP_MODEL,

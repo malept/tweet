@@ -95,8 +95,26 @@ tweet_animation_dispose (GObject *gobject)
 
   if (priv->timeline)
     {
+      if (priv->timeline_completed_id)
+        {
+          g_signal_handler_disconnect (priv->timeline, priv->timeline_completed_id);
+          priv->timeline_completed_id = 0;
+        }
+
       g_object_unref (priv->timeline);
       priv->timeline = NULL;
+    }
+
+  if (priv->alpha)
+    {
+      if (priv->alpha_notify_id)
+        {
+          g_signal_handler_disconnect (priv->alpha, priv->alpha_notify_id);
+          priv->alpha_notify_id = 0;
+        }
+
+      g_object_unref (priv->alpha);
+      priv->alpha = NULL;
     }
 
   G_OBJECT_CLASS (tweet_animation_parent_class)->dispose (gobject);
@@ -250,10 +268,7 @@ tweet_animation_set_actor (TweetAnimation *animation,
   priv = animation->priv;
 
   if (priv->actor)
-    {
-      g_object_unref (priv->actor);
-      priv->actor = NULL;
-    }
+    g_object_unref (priv->actor);
 
   priv->actor = g_object_ref (actor);
 
@@ -281,6 +296,29 @@ tweet_animation_set_mode (TweetAnimation     *animation,
   if (priv->mode != mode)
     {
       priv->mode = mode;
+
+      if (priv->alpha)
+        {
+          switch (priv->mode)
+            {
+            case TWEET_LINEAR:
+              clutter_alpha_set_func (priv->alpha,
+                                      CLUTTER_ALPHA_RAMP_INC,
+                                      NULL, NULL);
+              break;
+
+            case TWEET_SINE:
+              clutter_alpha_set_func (priv->alpha,
+                                      CLUTTER_ALPHA_SINE_INC,
+                                      NULL, NULL);
+              break;
+
+            default:
+              g_assert_not_reached ();
+              break;
+            }
+        }
+
       g_object_notify (G_OBJECT (animation), "mode");
     }
 }
@@ -351,6 +389,15 @@ tweet_animation_get_duration (TweetAnimation *animation)
   return animation->priv->duration;
 }
 
+/*
+ * tweet_interval_compute_value:
+ * @interval: a #TweetInterval
+ * @factor: the progress factor, between 0 and %CLUTTER_ALPHA_MAX_ALPHA
+ * @value: return location for an initialized #GValue
+ *
+ * Computes the value between the @interval boundaries fiven the
+ * progress @factor and puts it into @value.
+ */
 static void
 tweet_interval_compute_value (TweetInterval *interval,
                               guint32        factor,
@@ -617,8 +664,8 @@ on_timeline_completed (ClutterTimeline *timeline,
 }
 
 static void
-on_alpha_notify (GObject       *gobject,
-                 GParamSpec    *pspec,
+on_alpha_notify (GObject        *gobject,
+                 GParamSpec     *pspec,
                  TweetAnimation *animation)
 {
   TweetAnimationPrivate *priv = animation->priv;
@@ -639,9 +686,8 @@ on_alpha_notify (GObject       *gobject,
       g_assert (TWEET_IS_INTERVAL (interval));
 
       g_value_init (&value, tweet_interval_get_value_type (interval));
-      tweet_interval_compute_value (interval,
-                                    alpha_value,
-                                    &value);
+
+      tweet_interval_compute_value (interval, alpha_value, &value);
 
       g_object_set_property (G_OBJECT (priv->actor), p_name, &value);
 
@@ -741,6 +787,42 @@ on_animation_complete (TweetAnimation *animation,
   g_object_unref (animation);
 }
 
+/*
+ * tweet_actor_animate:
+ * @actor: a #ClutterActor
+ * @mode: a #TweetAnimationMode value
+ * @duration: duration of the animation, in milliseconds
+ * @first_property_name: the name of a property
+ * @VarArgs: a %NULL terminated list of properties and #TweetInterval<!-- -->s
+ *   pairs
+ *
+ * Animates the given list of properties of @actor between two values of
+ * an interval set for each property. The animation has a definite duration
+ * and a speed given by the @mode.
+ *
+ * For example, this:
+ *
+ * |[
+ *   tweet_actor_animate (rectangle, TWEET_LINEAR, 250,
+ *                        "width", tweet_interval_new (G_TYPE_UINT, 1, 100),
+ *                        "height", tweet_interval_new (G_TYPE_UINT, 1, 100),
+ *                        NULL);
+ * ]|
+ *
+ * will make width and height properties of the #ClutterActor "rectangle"
+ * grow linearly between the values of 1 and 100 pixels.
+ *
+ * This function will implicitly create a #TweetAnimation object which
+ * will be assigned to the @actor and will be returned to the developer
+ * to control the animation or to know when the animation has been
+ * completed.
+ *
+ * <note>Unless the animation is looping, it will become invalid as soon
+ * as it is complete.</note>
+ *
+ * Return value: a #TweetAnimation object. The object is owned by the
+ *   #ClutterActor and should not be unreferenced with g_object_unref()
+ */
 TweetAnimation *
 tweet_actor_animate (ClutterActor       *actor,
                      TweetAnimationMode  mode,

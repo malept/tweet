@@ -112,6 +112,7 @@ static guint client_signals[LAST_SIGNAL] = { 0, };
 
 G_DEFINE_TYPE (TwitterClient, twitter_client, G_TYPE_OBJECT);
 
+#ifdef TWEET_ENABLE_DEBUG
 static inline void
 twitter_debug (const gchar *action,
                const gchar *buffer)
@@ -119,6 +120,9 @@ twitter_debug (const gchar *action,
   if (g_getenv ("TWITTER_GLIB_DEBUG") != NULL)
     g_print ("[DEBUG]:%s: %s\n", action, buffer);
 }
+#else
+# define twitter_debug(a,b)
+#endif /* TWEET_ENABLE_DEBUG */
 
 static void
 twitter_client_finalize (GObject *gobject)
@@ -287,6 +291,7 @@ typedef enum {
   USER_SHOW,
   VERIFY_CREDENTIALS,
   END_SESSION,
+  ARCHIVE,
   FRIEND_CREATE,
   FRIEND_DESTROY,
   FAVORITE_CREATE,
@@ -298,6 +303,8 @@ typedef enum {
   N_CLIENT_ACTIONS
 } ClientAction;
 
+#ifdef TWEET_ENABLE_DEBUG
+/* XXX - keep in sync with the enumeration above */
 static const gchar *action_names[N_CLIENT_ACTIONS] = {
   "statuses/public_timeline",
   "statuses/friends_timeline",
@@ -312,6 +319,7 @@ static const gchar *action_names[N_CLIENT_ACTIONS] = {
   "users/show",
   "account/verify_credentials",
   "account/end_session",
+  "account/archive",
   "friendship/create",
   "friendship/destroy",
   "favorites/create",
@@ -320,6 +328,7 @@ static const gchar *action_names[N_CLIENT_ACTIONS] = {
   "notifications/follow",
   "notifications/leave"
 };
+#endif /* TWEET_ENABLE_DEBUG */
 
 typedef struct {
   ClientAction action;
@@ -327,13 +336,18 @@ typedef struct {
   guint requires_auth : 1;
 } ClientClosure;
 
-#define closure_set_action(c,v)        (((ClientClosure *) (c))->action) = (v)
-#define closure_get_action(c)          (((ClientClosure *) (c))->action)
-#define closure_set_client(c,v)        (((ClientClosure *) (c))->client) = (v)
-#define closure_get_client(c)          (((ClientClosure *) (c))->client)
-#define closure_set_requires_auth(c,v) (((ClientClosure *) (c))->requires_auth) = (v)
-#define closure_get_requires_auth(c)   (((ClientClosure *) (c))->requires_auth)
-#define closure_get_action_name(c)     (action_names[(((ClientClosure *) (c))->action)])
+#define closure_set_action(c,v)         (((ClientClosure *) (c))->action) = (v)
+#define closure_get_action(c)           (((ClientClosure *) (c))->action)
+#define closure_set_client(c,v)         (((ClientClosure *) (c))->client) = (v)
+#define closure_get_client(c)           (((ClientClosure *) (c))->client)
+#define closure_set_requires_auth(c,v)  (((ClientClosure *) (c))->requires_auth) = (v)
+#define closure_get_requires_auth(c)    (((ClientClosure *) (c))->requires_auth)
+
+#ifdef TWEET_ENABLE_DEBUG
+#define closure_get_action_name(c)      (action_names[(((ClientClosure *) (c))->action)])
+#else
+#define closure_get_action_name(c)      '\0'
+#endif
 
 typedef struct {
   ClientClosure closure;
@@ -912,6 +926,28 @@ twitter_client_get_favorites (TwitterClient *client,
 
   clos = g_new0 (GetTimelineClosure, 1);
   closure_set_action (clos, FAVORITES);
+  closure_set_client (clos, g_object_ref (client));
+  closure_set_requires_auth (clos, TRUE);
+  clos->timeline = twitter_timeline_new ();
+
+  twitter_client_queue_message (client, msg, TRUE,
+                                get_timeline_cb,
+                                clos);
+}
+
+void
+twitter_client_get_archive (TwitterClient *client,
+                            gint           page)
+{
+  GetTimelineClosure *clos;
+  SoupMessage *msg;
+
+  g_return_if_fail (TWITTER_IS_CLIENT (client));
+
+  msg = twitter_api_archive (page);
+
+  clos = g_new0 (GetTimelineClosure, 1);
+  closure_set_action (clos, ARCHIVE);
   closure_set_client (clos, g_object_ref (client));
   closure_set_requires_auth (clos, TRUE);
   clos->timeline = twitter_timeline_new ();

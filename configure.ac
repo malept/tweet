@@ -1,5 +1,5 @@
 m4_define([tweet_major_version], [0])
-m4_define([tweet_minor_version], [1])
+m4_define([tweet_minor_version], [3])
 m4_define([tweet_micro_version], [0])
 
 m4_define([tweet_version],
@@ -20,7 +20,7 @@ m4_define([json_glib_req_version], [0.6.0])
 m4_define([soup_req_version], [2.4.1])
 m4_define([clutter_req_version], [0.6.2])
 m4_define([gtk_req_version], [2.12])
-m4_define([clutter_gtk_req_version], [0.6.0])
+m4_define([clutter_gtk_req_version], [0.6.1])
 m4_define([clutter_cairo_req_version], [0.6.2])
 
 AC_PREREQ([2.59])
@@ -59,11 +59,11 @@ AC_SUBST(TWEET_MINOR_VERSION)
 AC_SUBST(TWEET_VERSION)
 
 dnl twitter-glib checks
-LT_CURRENT=lt_current
-LT_REVISION=lt_revision
-LT_AGE=lt_age
-LT_VERSION="$LT_CURRENT:$LT_REVISION:$LT_AGE"
-TWITTER_GLIB_LT_LDFLAGS="-version-info $LT_VERSION"
+LIBT_CURRENT=lt_current
+LIBT_REVISION=lt_revision
+LIBT_AGE=lt_age
+LIBT_VERSION="$LIBT_CURRENT:$LIBT_REVISION:$LIBT_AGE"
+TWITTER_GLIB_LT_LDFLAGS="-version-info $LIBT_VERSION"
 AC_SUBST(TWITTER_GLIB_LT_LDFLAGS)
 
 PKG_CHECK_MODULES(TWITTER_GLIB,
@@ -173,11 +173,17 @@ AC_CONFIG_FILES([
         po/Makefile.in
         data/Makefile
         data/icons/Makefile
+        data/icons/16x16/Makefile
+        data/icons/16x16/apps/Makefile
+        data/icons/22x22/Makefile
+        data/icons/22x22/apps/Makefile
         data/icons/32x32/Makefile
         data/icons/32x32/actions/Makefile
+        data/icons/32x32/apps/Makefile
         data/icons/32x32/status/Makefile
         data/icons/scalable/Makefile
         data/icons/scalable/actions/Makefile
+        data/icons/scalable/apps/Makefile
         data/icons/scalable/status/Makefile
         data/tweet-applet.desktop.in
 ])
