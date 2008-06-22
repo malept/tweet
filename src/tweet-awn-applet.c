@@ -239,7 +239,7 @@ tweet_applet_onclick (GtkWidget      *applet,
         subitem = gtk_radio_menu_item_new_with_label (subitem_group, _("Recent"));
         subitem_group = gtk_radio_menu_item_get_group (GTK_RADIO_MENU_ITEM (subitem));
         gtk_widget_show (subitem);
-        g_signal_connect (G_OBJECT (item), "activate",
+        g_signal_connect (G_OBJECT (subitem), "activate",
                           G_CALLBACK (tweet_applet_menu_view_recent),
                           TWEET_VBOX (tweet->vbox));
         gtk_check_menu_item_set_active (GTK_CHECK_MENU_ITEM (subitem), TRUE);
@@ -248,7 +248,7 @@ tweet_applet_onclick (GtkWidget      *applet,
         subitem = gtk_radio_menu_item_new_with_label (subitem_group, _("Replies"));
         subitem_group = gtk_radio_menu_item_get_group (GTK_RADIO_MENU_ITEM (subitem));
         gtk_widget_show (subitem);
-        g_signal_connect (G_OBJECT (item), "activate",
+        g_signal_connect (G_OBJECT (subitem), "activate",
                           G_CALLBACK (tweet_applet_menu_view_replies),
                           TWEET_VBOX (tweet->vbox));
         gtk_menu_shell_append (GTK_MENU_SHELL (submenu), subitem);
@@ -256,14 +256,14 @@ tweet_applet_onclick (GtkWidget      *applet,
         subitem = gtk_radio_menu_item_new_with_label (subitem_group, _("Archive"));
         subitem_group = gtk_radio_menu_item_get_group (GTK_RADIO_MENU_ITEM (subitem));
         gtk_widget_show (subitem);
-        g_signal_connect (G_OBJECT (item), "activate",
+        g_signal_connect (G_OBJECT (subitem), "activate",
                           G_CALLBACK (tweet_applet_menu_view_archive),
                           TWEET_VBOX (tweet->vbox));
         gtk_menu_shell_append (GTK_MENU_SHELL (submenu), subitem);
         /* mode = favorites */
         subitem = gtk_radio_menu_item_new_with_label (subitem_group, _("Favorites"));
         gtk_widget_show (subitem);
-        g_signal_connect (G_OBJECT (item), "activate",
+        g_signal_connect (G_OBJECT (subitem), "activate",
                           G_CALLBACK (tweet_applet_menu_view_favorites),
                           TWEET_VBOX (tweet->vbox));
         gtk_menu_shell_append (GTK_MENU_SHELL (submenu), subitem);
