@@ -75,6 +75,7 @@ GType        tweet_vbox_get_type        (void) G_GNUC_CONST;
 GtkWidget   *tweet_vbox_new             (void);
 GtkWidget   *tweet_vbox_get_canvas      (TweetVBox *vbox);
 TweetConfig *tweet_vbox_get_config      (TweetVBox *vbox);
+void         tweet_vbox_set_mode        (TweetVBox *vbox, TweetMode mode);
 inline void  tweet_vbox_clear           (TweetVBox *vbox);
 inline void  tweet_vbox_refresh         (TweetVBox *vbox);
 gboolean     tweet_vbox_refresh_timeout (TweetVBox *vbox);

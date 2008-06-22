@@ -720,6 +720,20 @@ tweet_vbox_constructed (GObject *gobject)
 #endif /* HAVE_NM_GLIB */
 }
 
+void
+tweet_vbox_set_mode (TweetVBox *vbox,
+                     TweetMode  mode)
+{
+  if (vbox->mode == mode)
+    return;
+
+  vbox->mode = mode;
+  vbox->last_update.tv_sec = 0;
+
+  tweet_vbox_clear (vbox);
+  tweet_vbox_refresh (vbox);
+}
+
 static void
 tweet_vbox_style_set (GtkWidget *widget,
                       GtkStyle  *old_style)

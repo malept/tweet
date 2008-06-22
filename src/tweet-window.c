@@ -285,60 +285,32 @@ static void
 tweet_window_cmd_view_recent (GtkAction   *action,
                               TweetWindow *window)
 {
-  TweetVBox *vbox = TWEET_VBOX (window->priv->vbox);
-  if (vbox->mode == TWEET_MODE_RECENT)
-    return;
-
-  vbox->mode = TWEET_MODE_RECENT;
-  vbox->last_update.tv_sec = 0;
-
-  tweet_vbox_clear (vbox);
-  tweet_vbox_refresh (vbox);
+  tweet_vbox_set_mode (TWEET_VBOX (window->priv->vbox),
+                       TWEET_MODE_RECENT);
 }
 
 static void
 tweet_window_cmd_view_replies (GtkAction   *action,
                                TweetWindow *window)
 {
-  TweetVBox *vbox = TWEET_VBOX (window->priv->vbox);
-  if (vbox->mode == TWEET_MODE_REPLIES)
-    return;
-
-  vbox->mode = TWEET_MODE_REPLIES;
-  vbox->last_update.tv_sec = 0;
-
-  tweet_vbox_clear (vbox);
-  tweet_vbox_refresh (vbox);
+  tweet_vbox_set_mode (TWEET_VBOX (window->priv->vbox),
+                       TWEET_MODE_REPLIES);
 }
 
 static void
 tweet_window_cmd_view_archive (GtkAction   *action,
                                TweetWindow *window)
 {
-  TweetVBox *vbox = TWEET_VBOX (window->priv->vbox);
-  if (vbox->mode == TWEET_MODE_ARCHIVE)
-    return;
-
-  vbox->mode = TWEET_MODE_ARCHIVE;
-  vbox->last_update.tv_sec = 0;
-
-  tweet_vbox_clear (vbox);
-  tweet_vbox_refresh (vbox);
+  tweet_vbox_set_mode (TWEET_VBOX (window->priv->vbox),
+                       TWEET_MODE_ARCHIVE);
 }
 
 static void
 tweet_window_cmd_view_favorites (GtkAction   *action,
                                  TweetWindow *window)
 {
-  TweetVBox *vbox = TWEET_VBOX (window->priv->vbox);
-  if (vbox->mode == TWEET_MODE_FAVORITES)
-    return;
-
-  vbox->mode = TWEET_MODE_FAVORITES;
-  vbox->last_update.tv_sec = 0;
-
-  tweet_vbox_clear (vbox);
-  tweet_vbox_refresh (vbox);
+  tweet_vbox_set_mode (TWEET_VBOX (window->priv->vbox),
+                       TWEET_MODE_FAVORITES);
 }
 
 static void
