@@ -107,14 +107,12 @@ static gboolean
 tweet_applet_menu_view_archive (GtkMenuItem *item,
                                 TweetVBox   *vbox)
 {
-  /*
   if (vbox->mode != TWEET_MODE_ARCHIVE)
   {
     vbox->mode = TWEET_MODE_ARCHIVE;
     gtk_check_menu_item_set_active (GTK_CHECK_MENU_ITEM (item), TRUE);
     tweet_vbox_refresh (vbox);
   }
-  */
   return TRUE;
 }
 
