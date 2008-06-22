@@ -186,6 +186,7 @@ on_timeline_complete (TwitterClient *client,
     }
 }
 
+#ifdef HAVE_NM_GLIB
 static void
 on_user_received (TwitterClient *client,
                   TwitterUser   *user,
@@ -201,7 +202,6 @@ on_user_received (TwitterClient *client,
     }
 }
 
-#ifdef HAVE_NM_GLIB
 static void
 nm_context_callback (libnm_glib_ctx *libnm_ctx,
                      gpointer        user_data)
