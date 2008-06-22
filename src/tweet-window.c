@@ -30,6 +30,10 @@
 
 #include <gtk/gtk.h>
 
+#ifdef HAVE_NM_GLIB
+#include <libnm_glib.h>
+#endif
+
 #include "tweet-preferences.h"
 #include "tweet-vbox.h"
 #include "tweet-window.h"
