@@ -281,7 +281,7 @@ awn_applet_factory_initp (const gchar *uid, gint orient, gint height)
   tweet->applet = AWN_APPLET_SIMPLE (awn_applet_simple_new (uid, orient, height));
   awn_applet_simple_set_temp_icon (tweet->applet,
                                    gtk_icon_theme_load_icon (theme,
-                                                             "document-send",
+                                                             "tweet",
                                                              height, 0, NULL));
   g_signal_connect (G_OBJECT (tweet->applet), "button-press-event",
                     G_CALLBACK (tweet_applet_onclick), tweet);
