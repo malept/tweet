@@ -735,6 +735,86 @@ tweet_vbox_set_mode (TweetVBox *vbox,
 }
 
 static void
+about_url_hook (GtkAboutDialog *dialog,
+                const gchar    *link_,
+                gpointer        user_data)
+{
+  GdkScreen *screen;
+  gint pid;
+  GError *error;
+  gchar **argv;
+
+  if (gtk_widget_has_screen (GTK_WIDGET (dialog)))
+    screen = gtk_widget_get_screen (GTK_WIDGET (dialog));
+  else
+    screen = gdk_screen_get_default ();
+
+  argv = g_new (gchar*, 3);
+  argv[0] = g_strdup ("xdg-open");
+  argv[1] = g_strdup (link_);
+  argv[2] = NULL;
+
+  error = NULL;
+  gdk_spawn_on_screen (screen,
+                       NULL,
+                       argv, NULL,
+                       G_SPAWN_SEARCH_PATH,
+                       NULL, NULL,
+                       &pid, &error);
+  if (error)
+    {
+      g_critical ("Unable to launch xdg-open: %s", error->message);
+      g_error_free (error);
+    }
+
+  g_strfreev (argv);
+}
+
+void
+tweet_vbox_show_about_dialog (GtkWidget *vbox)
+{
+  GtkWindow *window;
+
+  const gchar *authors[] = {
+    "Emmanuele Bassi <ebassi@gnome.org>",
+    NULL
+  };
+
+  const gchar *artists[] = {
+    "Ulisse Perusin <uli.peru@gmail.com>",
+    NULL
+  };
+
+  const gchar *translator_credits = _("translator-credits");
+  const gchar *copyright = "Copyright \xc2\xa9 2008 Emmanuele Bassi";
+
+  const gchar *license_text =
+    _("This program is free software: you can redistribute it and/or "
+      "modify it under the terms of the GNU General Public License as "
+      "published by the Free Software Foundation, either version 3 of "
+      "the License, or (at your option) any later version.");
+
+  gtk_about_dialog_set_url_hook (about_url_hook, NULL, NULL);
+
+  window = GTK_WINDOW (gtk_widget_get_parent (vbox));
+
+  gtk_show_about_dialog (window,
+                         "program-name", "Tweet",
+                         "title", _("About Tweet"),
+                         "comments", _("Twitter desktop client"),
+                         "logo-icon-name", "tweet",
+                         "version", VERSION,
+                         "copyright", copyright,
+                         "authors", authors,
+                         "artists", artists,
+                         "translator-credits", translator_credits,
+                         "website", "http://live.gnome.org/Tweet",
+                         "license", license_text,
+                         "wrap-license", TRUE,
+                         NULL);
+}
+
+static void
 tweet_vbox_style_set (GtkWidget *widget,
                       GtkStyle  *old_style)
 {

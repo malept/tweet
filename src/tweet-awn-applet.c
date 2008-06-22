@@ -106,9 +106,10 @@ tweet_applet_menu_view_favorites (GtkCheckMenuItem *item,
 }
 
 static gboolean
-tweet_applet_menu_show_about (GtkMenuItem *item)
+tweet_applet_menu_show_about (GtkMenuItem *item,
+                              GtkWidget   *vbox)
 {
-  g_message ("TODO: ADD ABOUT DIALOG");
+  tweet_vbox_show_about_dialog (vbox);
   return TRUE;
 }
 
@@ -248,7 +249,7 @@ tweet_applet_onclick (GtkWidget      *applet,
         gtk_widget_show (item);
         g_signal_connect (G_OBJECT (item), "activate",
                           G_CALLBACK (tweet_applet_menu_show_about),
-                          NULL);
+                          tweet->vbox);
         gtk_menu_shell_append (GTK_MENU_SHELL (tweet->menu), item);
       }
       gtk_menu_popup (GTK_MENU (tweet->menu),
