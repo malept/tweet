@@ -114,13 +114,11 @@ tweet_window_status_message (TweetWindow     *window,
                         window);
     }
 
-  gtk_status_icon_set_visible (priv->status_icon, TRUE);
 
   va_start (args, format);
   message = g_strdup_vprintf (format, args);
   va_end (args);
 
-  gtk_status_icon_set_tooltip (priv->status_icon, message);
 
   switch (status_mode)
     {
@@ -128,16 +126,21 @@ tweet_window_status_message (TweetWindow     *window,
       break;
 
     case TWEET_STATUS_ERROR:
-      g_warning (message);
+      gtk_status_icon_set_from_icon_name (priv->status_icon, "tweet-error");
+      gtk_status_icon_set_visible (priv->status_icon, TRUE);
+      gtk_status_icon_set_tooltip (priv->status_icon, message);
       break;
 
     case TWEET_STATUS_NO_CONNECTION:
-      g_warning (message);
+      gtk_status_icon_set_from_icon_name (priv->status_icon, "tweet-no-connection");
+      gtk_status_icon_set_visible (priv->status_icon, TRUE);
+      gtk_status_icon_set_tooltip (priv->status_icon, message);
       break;
 
     case TWEET_STATUS_RECEIVED:
-      g_print (message);
-      g_print ("\n");
+      gtk_status_icon_set_from_icon_name (priv->status_icon, "tweet-new-status");
+      gtk_status_icon_set_visible (priv->status_icon, TRUE);
+      gtk_status_icon_set_tooltip (priv->status_icon, message);
       break;
     }
 
@@ -156,16 +159,13 @@ on_status_received (TwitterClient *client,
        * silently ignore the error; Twitter-GLib still emits it
        * so that clients can notify the user anyway
        */
-      if (error->domain == TWITTER_ERROR &&
-          error->code == TWITTER_ERROR_NOT_MODIFIED)
+      if (error->domain != TWITTER_ERROR ||
+          error->code != TWITTER_ERROR_NOT_MODIFIED)
         {
-          tweet_window_status_message (window, TWEET_STATUS_MESSAGE,
-                                       _("No new statuses"));
+          tweet_window_status_message (window, TWEET_STATUS_ERROR,
+                                       _("Unable to retrieve status from Twitter: %s"),
+                                       error->message);
         }
-      else
-        tweet_window_status_message (window, TWEET_STATUS_ERROR,
-                                     _("Unable to retrieve status from Twitter: %s"),
-                                     error->message);
     }
 }
 
@@ -190,7 +190,6 @@ on_timeline_complete (TwitterClient *client,
     }
 }
 
-#ifdef HAVE_NM_GLIB
 static void
 on_user_received (TwitterClient *client,
                   TwitterUser   *user,
@@ -200,12 +199,13 @@ on_user_received (TwitterClient *client,
   if (error)
     {
       tweet_window_status_message (window, TWEET_STATUS_ERROR,
-                                   _("Unable to retrieve used `%s': %s"),
+                                   _("Unable to retrieve user `%s': %s"),
                                    tweet_config_get_username (tweet_config_get_default ()),
                                    error->message);
     }
 }
 
+#ifdef HAVE_NM_GLIB
 static void
 nm_context_callback (libnm_glib_ctx *libnm_ctx,
                      gpointer        user_data)
@@ -238,9 +238,9 @@ nm_context_callback (libnm_glib_ctx *libnm_ctx,
 static void
 tweet_window_constructed (GObject *gobject)
 {
-#ifdef HAVE_NM_GLIB
   TweetWindow *window = TWEET_WINDOW (gobject);
   TweetWindowPrivate *priv = window->priv;
+#ifdef HAVE_NM_GLIB
   libnm_glib_state nm_state;
 
   priv->nm_context = libnm_glib_init ();
@@ -248,20 +248,19 @@ tweet_window_constructed (GObject *gobject)
   nm_state = libnm_glib_get_network_state (priv->nm_context);
   if (nm_state == LIBNM_ACTIVE_NETWORK_CONNECTION)
     {
-      const gchar *email_address;
-
       g_signal_connect (TWEET_VBOX (priv->vbox)->client,
                         "user-received", G_CALLBACK (on_user_received),
                         window);
-
-      email_address = tweet_config_get_username (priv->config);
-      twitter_client_show_user_from_email (priv->client, email_address);
     }
   else
     {
       tweet_window_status_message (window, TWEET_STATUS_NO_CONNECTION,
                                    _("No network connection available"));
     }
+#else
+    g_signal_connect (TWEET_VBOX (priv->vbox)->client,
+                      "user-received", G_CALLBACK (on_user_received),
+                      window);
 #endif /* HAVE_NM_GLIB */
 }
 

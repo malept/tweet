@@ -557,7 +557,6 @@ tweet_vbox_refresh_timeout (TweetVBox *vbox)
   return TRUE;
 }
 
-#ifdef HAVE_NM_GLIB
 static void
 on_user_received (TwitterClient *client,
                   TwitterUser   *user,
@@ -583,6 +582,7 @@ on_user_received (TwitterClient *client,
   priv->user = g_object_ref (user);
 }
 
+#ifdef HAVE_NM_GLIB
 static void
 nm_context_callback (libnm_glib_ctx *libnm_ctx,
                      gpointer        user_data)
@@ -710,13 +710,25 @@ tweet_vbox_constructed (GObject *gobject)
                                               vbox,
                                               NULL);
 #else
-  twitter_client_get_friends_timeline (vbox->client, NULL, 0);
+  {
+    const gchar *email_address;
+    gint refresh_time;
+ 
+    g_signal_connect (vbox->client,
+                      "user-received", G_CALLBACK (on_user_received),
+                      vbox);
 
-  if (tweet_config_get_refresh_time (priv->config) > 0)
-    vbox->refresh_id =
-      g_timeout_add_seconds (tweet_config_get_refresh_time (priv->config),
-                             (GSourceFunc)tweet_vbox_refresh_timeout,
-                             vbox);
+    email_address = tweet_config_get_username (priv->config);
+    twitter_client_show_user_from_email (vbox->client, email_address);
+
+    twitter_client_get_friends_timeline (vbox->client, NULL, 0);
+
+    refresh_time = tweet_config_get_refresh_time (priv->config);
+    if (refresh_time > 0)
+      vbox->refresh_id = g_timeout_add_seconds (refresh_time,
+                                                (GSourceFunc)tweet_vbox_refresh_timeout,
+                                                vbox);
+  }
 #endif /* HAVE_NM_GLIB */
 }
 
@@ -914,8 +926,11 @@ tweet_vbox_init (TweetVBox *vbox)
   priv->status_model = TWEET_STATUS_MODEL (tweet_status_model_new ());
 
   priv->config = tweet_config_get_default ();
-  vbox->client = twitter_client_new_for_user (tweet_config_get_username (priv->config),
-                                              tweet_config_get_password (priv->config));
+  vbox->client = g_object_new (TWITTER_TYPE_CLIENT,
+                               "email", tweet_config_get_username (priv->config),
+                               "password", tweet_config_get_password (priv->config),
+                               "user-agent", "Tweet",
+                               NULL);
   g_signal_connect (vbox->client,
                     "status-received", G_CALLBACK (on_status_received),
                     vbox);

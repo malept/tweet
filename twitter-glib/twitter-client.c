@@ -33,11 +33,16 @@
  * set.
  *
  * Authentication is handled automatically by setting the
- * TwitterClient:email and TwitterClient:password properties.
+ * #TwitterClient:email and #TwitterClient:password properties.
  * These two properties can be set at construction time or by
  * using twitter_client_set_user(). Interactive authentication
- * can be implemented by using the TwitterClient::authenticate
- * signal as well.
+ * can be implemented by using the #TwitterClient::authenticate
+ * signal as well: when the signal passes the #TwitterAuthState value
+ * or %TWITTER_AUTH_NEGOTIATING the handler should set the user
+ * credentials with twitter_client_set_user(); in case of error,
+ * the ::authenticate signal will use %TWITTER_AUTH_RETRY until the
+ * authentication succeeds or the signal handler returns %FALSE,
+ * in which case the %TWITTER_AUTH_FAILED state will be used.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -81,6 +86,8 @@ struct _TwitterClientPrivate
 {
   SoupSession *session_async;
 
+  gchar *user_agent;
+
   gchar *email;
   gchar *password;
 
@@ -94,7 +101,8 @@ enum
   PROP_0,
 
   PROP_EMAIL,
-  PROP_PASSWORD
+  PROP_PASSWORD,
+  PROP_USER_AGENT
 };
 
 enum
@@ -132,6 +140,7 @@ twitter_client_finalize (GObject *gobject)
   soup_session_abort (priv->session_async);
   g_object_unref (priv->session_async);
 
+  g_free (priv->user_agent);
   g_free (priv->email);
   g_free (priv->password);
 
@@ -158,6 +167,11 @@ twitter_client_set_property (GObject      *gobject,
       priv->password = g_value_dup_string (value);
       break;
 
+    case PROP_USER_AGENT:
+      g_free (priv->user_agent);
+      priv->user_agent = g_value_dup_string (value);
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (gobject, prop_id, pspec);
       break;
@@ -182,10 +196,31 @@ twitter_client_get_property (GObject    *gobject,
       g_value_set_string (value, priv->password);
       break;
 
+    case PROP_USER_AGENT:
+      g_value_set_string (value, priv->user_agent);
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (gobject, prop_id, pspec);
       break;
     }
+}
+
+static void
+twitter_client_constructed (GObject *gobject)
+{
+  TwitterClientPrivate *priv = TWITTER_CLIENT (gobject)->priv;
+  gchar *user_agent;
+
+  if (!priv->user_agent)
+    user_agent = g_strdup ("Twitter-GLib/" VERSION);
+  else
+    user_agent = g_strdup (priv->user_agent);
+
+  priv->session_async =
+    soup_session_async_new_with_options ("user-agent", user_agent, NULL);
+
+  g_free (user_agent);
 }
 
 static void
@@ -195,6 +230,7 @@ twitter_client_class_init (TwitterClientClass *klass)
 
   g_type_class_add_private (klass, sizeof (TwitterClientPrivate));
 
+  gobject_class->constructed = twitter_client_constructed;
   gobject_class->set_property = twitter_client_set_property;
   gobject_class->get_property = twitter_client_get_property;
   gobject_class->finalize = twitter_client_finalize;
@@ -213,7 +249,46 @@ twitter_client_class_init (TwitterClientClass *klass)
                                                         "The password of the user, for authentication purposes",
                                                         NULL,
                                                         G_PARAM_READWRITE));
+  g_object_class_install_property (gobject_class,
+                                   PROP_USER_AGENT,
+                                   g_param_spec_string ("user-agent",
+                                                        "User Agent",
+                                                        "The client name to be used when connecting",
+                                                        NULL,
+                                                        G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE));
 
+  /**
+   * TwitterClient::authenticate:
+   * @client: the #TwitterClient that received the signal
+   * @state: the state of the authentication process
+   *
+   * Handles the authentication of the user onto the Twitter services.
+   *
+   * The authentication can be a multi-state process. If the user's
+   * credentials were not set before issuing a command that requires
+   * authentication, the ::authenticate signal will be emitted with the
+   * %TWITTER_AUTH_NEGOTIATING state. In this case, the credentials must
+   * be set and the handler must return %TRUE.
+   *
+   * |[
+   *   if (state == TWITTER_AUTH_NEGOTIATING)
+   *     {
+   *       twitter_client_set_user (client, email, password);
+   *       return TRUE;
+   *     }
+   * ]|
+   *
+   * In case of failed authentication, the %TWITTER_AUTH_RETRY state
+   * will be used until the handler sets the correct credentials and
+   * returns %TRUE or aborts the authentication process and returns
+   * %FALSE; in the latter case, the signal will be emitted one last
+   * time with the %TWITTER_AUTH_FAILED state.
+   *
+   * If the authentication was successful, the signal will be emitted
+   * with the %TWITTER_AUTH_SUCCESS state.
+   *
+   * Return value: %TRUE if the user credentials were correctly set
+   */
   client_signals[AUTHENTICATE] =
     g_signal_new (I_("authenticate"),
                   G_TYPE_FROM_CLASS (gobject_class),
@@ -271,10 +346,6 @@ twitter_client_init (TwitterClient *client)
   client->priv = priv = TWITTER_CLIENT_GET_PRIVATE (client);
 
   priv->auth_id = 0;
-
-  priv->session_async =
-    soup_session_async_new_with_options ("user-agent", "Twitter-GLib/" VERSION,
-                                         NULL);
 }
 
 typedef enum {
