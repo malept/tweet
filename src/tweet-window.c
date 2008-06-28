@@ -469,7 +469,7 @@ tweet_window_init (TweetWindow *window)
   else
     {
       priv->menubar = gtk_ui_manager_get_widget (priv->manager, "/TweetMenubar");
-      gtk_container_add (GTK_CONTAINER (priv->vbox), priv->menubar);
+      gtk_box_pack_start (GTK_BOX (priv->vbox), priv->menubar, FALSE, FALSE, 0);
       gtk_box_reorder_child (GTK_BOX (priv->vbox), priv->menubar, 0);
       gtk_widget_show (priv->menubar);
     }
