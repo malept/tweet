@@ -42,6 +42,7 @@ tweet_h = \
 	tweet-animation.h \
 	tweet-app.h \
 	tweet-auth-dialog.h \
+	tweet-canvas.h \
 	tweet-config.h \
 	tweet-interval.h \
 	tweet-overlay.h \
@@ -86,6 +87,8 @@ libtweet_ui_la_SOURCES = \
 	tweet-app.h \
 	tweet-auth-dialog.c \
 	tweet-auth-dialog.h \
+	tweet-canvas.c \
+	tweet-canvas.h \
 	tweet-config.c \
 	tweet-config.h \
 	tweet-enum-types.c \

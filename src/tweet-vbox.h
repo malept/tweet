@@ -22,15 +22,13 @@
 
 #include <gtk/gtkvbox.h>
 #include "twitter-client.h"
+#include "tweet-canvas.h"
 #include "tweet-config.h"
 
 G_BEGIN_DECLS
 
-#define TWEET_CANVAS_WIDTH    350
-#define TWEET_CANVAS_HEIGHT   500
 #define TWEET_CANVAS_PADDING  6
-
-#define TWEET_VBOX_WIDTH    (TWEET_CANVAS_WIDTH + (2 * TWEET_CANVAS_PADDING))
+#define TWEET_VBOX_WIDTH    (TWEET_CANVAS_MIN_WIDTH + (2 * TWEET_CANVAS_PADDING))
 
 typedef enum {
   TWEET_MODE_RECENT,

@@ -43,6 +43,7 @@
 #include <twitter-glib/twitter-glib.h>
 
 #include "tweet-animation.h"
+#include "tweet-canvas.h"
 #include "tweet-config.h"
 #include "tweet-spinner.h"
 #include "tweet-status-info.h"
@@ -139,10 +140,16 @@ on_status_received (TwitterClient *client,
 
   if (error)
     {
+      TweetAnimation *animation;
+
       tweet_spinner_stop (TWEET_SPINNER (priv->spinner));
-      tweet_actor_animate (priv->spinner, TWEET_LINEAR, 500,
-                           "opacity", tweet_interval_new (G_TYPE_UCHAR, 127, 0),
-                           NULL);
+      animation =
+        tweet_actor_animate (priv->spinner, TWEET_LINEAR, 500,
+                             "opacity", tweet_interval_new (G_TYPE_UCHAR, 127, 0),
+                             NULL);
+      g_signal_connect_swapped (animation,
+                                "completed", G_CALLBACK (clutter_actor_hide),
+                                priv->spinner);
 
       /* if the content was not modified since the last update,
        * silently ignore the error; Twitter-GLib still emits it
@@ -410,6 +417,7 @@ on_status_view_button_release (ClutterActor       *actor,
       ClutterGeometry geometry = { 0, };
       ClutterActor *stage;
       ClutterColor info_color = { 255, 255, 255, 255 };
+      GtkRequisition canvas_req = { 0, };
 
       priv->in_press = FALSE;
 
@@ -466,18 +474,31 @@ on_status_view_button_release (ClutterActor       *actor,
       clutter_actor_set_reactive (priv->info, FALSE);
       clutter_actor_show (priv->info);
 
-      /* the status info is non-reactive until it has
-       * been fully "unrolled" by the animation
-       */
-      animation =
-        tweet_actor_animate (priv->info, TWEET_LINEAR, 250,
-                             "y", tweet_interval_new (G_TYPE_INT, geometry.y + TWEET_CANVAS_PADDING, 100 + TWEET_CANVAS_PADDING),
-                             "height", tweet_interval_new (G_TYPE_INT, 16, (TWEET_CANVAS_HEIGHT - (100 * 2))),
-                             "opacity", tweet_interval_new (G_TYPE_UCHAR, 0, 224),
-                             NULL);
-      g_signal_connect (animation,
-                        "completed", G_CALLBACK (on_status_info_visible),
-                        vbox);
+      {
+        gint old_y, new_y;
+        gint old_height, new_height;
+
+        gtk_widget_size_request (priv->canvas, &canvas_req);
+
+        old_y = geometry.y + TWEET_CANVAS_PADDING;
+        new_y = 100 + TWEET_CANVAS_PADDING;
+
+        old_height = 16;
+        new_height = canvas_req.height - (100 * 2);
+
+         /* the status info is non-reactive until it has
+          * been fully "unrolled" by the animation
+          */
+        animation =
+          tweet_actor_animate (priv->info, TWEET_LINEAR, 250,
+                               "y", tweet_interval_new (G_TYPE_INT, old_y, new_y),
+                               "height", tweet_interval_new (G_TYPE_INT, old_height, new_height),
+                               "opacity", tweet_interval_new (G_TYPE_UCHAR, 0, 224),
+                               NULL);
+        g_signal_connect (animation,
+                          "completed", G_CALLBACK (on_status_info_visible),
+                          vbox);
+      }
 
       /* set the status view as not reactive to avoid opening
        * the status info on double tap
@@ -644,6 +665,7 @@ tweet_vbox_constructed (GObject *gobject)
   TweetVBoxPrivate *priv = vbox->priv;
   ClutterActor *stage;
   ClutterActor *img;
+  GtkRequisition canvas_req = { 0, };
 #ifdef HAVE_NM_GLIB
   libnm_glib_state nm_state;
 #endif /* HAVE_NM_GLIB */
@@ -656,14 +678,15 @@ tweet_vbox_constructed (GObject *gobject)
   if (!img)
     g_critical ("Unable to load the `%s' stock icon", GTK_STOCK_REFRESH);
 
+  gtk_widget_size_request (priv->canvas, &canvas_req);
+
   priv->spinner = tweet_spinner_new ();
   tweet_spinner_set_image (TWEET_SPINNER (priv->spinner), img);
   clutter_container_add_actor (CLUTTER_CONTAINER (stage), priv->spinner);
   clutter_actor_set_size (priv->spinner, 128, 128);
-  clutter_actor_set_anchor_point (priv->spinner, 64, 64);
   clutter_actor_set_position (priv->spinner,
-                              TWEET_VBOX_WIDTH / 2,
-                              TWEET_CANVAS_HEIGHT / 2);
+                              (canvas_req.width + (2 * TWEET_CANVAS_PADDING) - 128) / 2,
+                              (canvas_req.height - 128) / 2);
   clutter_actor_show (priv->spinner);
   tweet_spinner_start (TWEET_SPINNER (priv->spinner));
   tweet_actor_animate (priv->spinner, TWEET_LINEAR, 500,
@@ -699,9 +722,13 @@ tweet_vbox_constructed (GObject *gobject)
   else
     {
       tweet_spinner_stop (TWEET_SPINNER (priv->spinner));
-      tweet_actor_animate (priv->spinner, TWEET_LINEAR, 500,
-                           "opacity", tweet_interval_new (G_TYPE_UCHAR, 127, 0),
-                           NULL);
+      animation =
+        tweet_actor_animate (priv->spinner, TWEET_LINEAR, 500,
+                             "opacity", tweet_interval_new (G_TYPE_UCHAR, 127, 0),
+                             NULL);
+      g_signal_connect_swapped (animation,
+                                "completed", G_CALLBACK (clutter_actor_hide),
+                                priv->spinner);
     }
 
   priv->nm_state = nm_state;
@@ -898,6 +925,28 @@ on_canvas_focus_out (GtkWidget     *widget,
 }
 
 static void
+on_canvas_size_allocate (GtkWidget     *widget,
+                         GtkAllocation *allocation,
+                         TweetVBox     *vbox)
+{
+  TweetVBoxPrivate *priv = vbox->priv;
+
+  if (!priv->scroll)
+    return;
+
+  clutter_actor_set_size (priv->scroll,
+                          allocation->width,
+                          allocation->height);
+  clutter_actor_set_size (priv->status_view,
+                          allocation->width,
+                          allocation->height);
+
+  clutter_actor_set_position (priv->spinner,
+                              (allocation->width + (2 * TWEET_CANVAS_PADDING) - 128) / 2,
+                              (allocation->height - 128) / 2);
+}
+
+static void
 tweet_vbox_class_init (TweetVBoxClass *klass)
 {
   GObjectClass *gobject_class = G_OBJECT_CLASS (klass);
@@ -918,6 +967,7 @@ tweet_vbox_init (TweetVBox *vbox)
   GtkWidget *frame, *hbox, *button;
   ClutterActor *stage, *view;
   ClutterColor stage_color = { 0, 0, 0, 255 };
+  GtkRequisition canvas_req = { 0, };
 
   vbox->priv = priv = TWEET_VBOX_GET_PRIVATE (vbox);
 
@@ -943,28 +993,29 @@ tweet_vbox_init (TweetVBox *vbox)
   gtk_container_add (GTK_CONTAINER (vbox), frame);
   gtk_widget_show (frame);
 
-  priv->canvas = gtk_clutter_embed_new ();
+  priv->canvas = tweet_canvas_new ();
+  tweet_canvas_set_border_width (TWEET_CANVAS (priv->canvas), TWEET_CANVAS_PADDING);
+
   g_signal_connect (priv->canvas,
                     "focus-in-event", G_CALLBACK (on_canvas_focus_in),
                     vbox);
   g_signal_connect (priv->canvas,
                     "focus-out-event", G_CALLBACK (on_canvas_focus_out),
                     vbox);
-  GTK_WIDGET_SET_FLAGS (priv->canvas, GTK_CAN_FOCUS);
+  g_signal_connect (priv->canvas,
+                    "size-allocate", G_CALLBACK (on_canvas_size_allocate),
+                    vbox);
 
-  gtk_widget_set_size_request (priv->canvas,
-                               TWEET_CANVAS_WIDTH + TWEET_CANVAS_PADDING,
-                               TWEET_CANVAS_HEIGHT + TWEET_CANVAS_PADDING);
+  GTK_WIDGET_SET_FLAGS (priv->canvas, GTK_CAN_FOCUS);
   gtk_container_add (GTK_CONTAINER (frame), priv->canvas);
 
+  gtk_widget_size_request (priv->canvas, &canvas_req);
+
   stage = gtk_clutter_embed_get_stage (GTK_CLUTTER_EMBED (priv->canvas));
-  gtk_widget_set_size_request (priv->canvas,
-                               TWEET_CANVAS_WIDTH + TWEET_CANVAS_PADDING,
-                               TWEET_CANVAS_HEIGHT + TWEET_CANVAS_PADDING);
   clutter_stage_set_color (CLUTTER_STAGE (stage), &stage_color);
   clutter_actor_set_size (stage,
-                          TWEET_CANVAS_WIDTH + TWEET_CANVAS_PADDING,
-                          TWEET_CANVAS_HEIGHT + TWEET_CANVAS_PADDING);
+                          canvas_req.width + TWEET_CANVAS_PADDING,
+                          canvas_req.height + TWEET_CANVAS_PADDING);
 
   view = tweet_status_view_new (priv->status_model);
   g_signal_connect (view,
@@ -979,7 +1030,7 @@ tweet_vbox_init (TweetVBox *vbox)
   clutter_actor_set_reactive (view, TRUE);
   priv->status_view = view;
 
-  clutter_actor_set_size (priv->scroll, TWEET_CANVAS_WIDTH, TWEET_CANVAS_HEIGHT);
+  clutter_actor_set_size (priv->scroll, canvas_req.width, canvas_req.height);
   clutter_actor_set_position (priv->scroll, TWEET_CANVAS_PADDING, TWEET_CANVAS_PADDING);
   clutter_container_add_actor (CLUTTER_CONTAINER (stage), priv->scroll);
   clutter_actor_set_reactive (priv->scroll, TRUE);
