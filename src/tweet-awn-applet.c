@@ -59,50 +59,67 @@ tweet_applet_create_vbox (TweetAwnApplet *tweet)
 }
 
 static gboolean
-tweet_applet_menu_do_refresh (GtkMenuItem *item,
-                              TweetVBox   *vbox)
+tweet_applet_menu_do_refresh (GtkMenuItem    *item,
+                              TweetAwnApplet *tweet)
 {
-  if (vbox->refresh_id)
+  if (tweet->vbox)
   {
-    g_source_remove (vbox->refresh_id);
-    vbox->refresh_id = 0;
+    TweetVBox *vbox = TWEET_VBOX (tweet->vbox);
+
+    if (vbox->refresh_id)
+    {
+      g_source_remove (vbox->refresh_id);
+      vbox->refresh_id = 0;
+    }
+
+    tweet_vbox_refresh (vbox);
+
+    vbox->refresh_id =
+      g_timeout_add_seconds (tweet_config_get_refresh_time (tweet_vbox_get_config (vbox)),
+                             (GSourceFunc)tweet_vbox_refresh_timeout,
+                             vbox);
   }
-
-  tweet_vbox_refresh (vbox);
-
-  vbox->refresh_id =
-    g_timeout_add_seconds (tweet_config_get_refresh_time (tweet_vbox_get_config (vbox)),
-                           (GSourceFunc)tweet_vbox_refresh_timeout,
-                           vbox);
   return TRUE;
 }
 
 static void
 tweet_applet_menu_view_recent (GtkCheckMenuItem *item,
-                               TweetVBox        *vbox)
+                               TweetAwnApplet   *tweet)
 {
-  tweet_vbox_set_mode (vbox, TWEET_MODE_RECENT);
+  if (tweet->vbox)
+  {
+    tweet_vbox_set_mode (TWEET_VBOX (tweet->vbox), TWEET_MODE_RECENT);
+  }
 }
 
 static void
 tweet_applet_menu_view_replies (GtkCheckMenuItem *item,
-                                TweetVBox        *vbox)
+                                TweetAwnApplet   *tweet)
 {
-  tweet_vbox_set_mode (vbox, TWEET_MODE_REPLIES);
+  if (tweet->vbox)
+  {
+    tweet_vbox_set_mode (TWEET_VBOX (tweet->vbox), TWEET_MODE_REPLIES);
+  }
 }
 
 static void
 tweet_applet_menu_view_archive (GtkCheckMenuItem *item,
-                                TweetVBox        *vbox)
+                                TweetAwnApplet   *tweet)
 {
-  tweet_vbox_set_mode (vbox, TWEET_MODE_ARCHIVE);
+  if (tweet->vbox)
+  {
+    tweet_vbox_set_mode (TWEET_VBOX (tweet->vbox), TWEET_MODE_ARCHIVE);
+  }
 }
 
 static void
 tweet_applet_menu_view_favorites (GtkCheckMenuItem *item,
-                                  TweetVBox        *vbox)
+                                  TweetAwnApplet   *tweet)
 {
-  tweet_vbox_set_mode (vbox, TWEET_MODE_FAVORITES);
+  if (tweet->vbox)
+  {
+    tweet_vbox_set_mode (TWEET_VBOX (tweet->vbox), TWEET_MODE_FAVORITES);
+  }
 }
 
 static gboolean
@@ -202,7 +219,7 @@ tweet_applet_onclick (GtkWidget      *applet,
         gtk_widget_show (item);
         g_signal_connect (G_OBJECT (item), "activate",
                           G_CALLBACK (tweet_applet_menu_do_refresh),
-                          TWEET_VBOX (tweet->vbox));
+                          tweet);
         gtk_menu_shell_append (GTK_MENU_SHELL (tweet->menu), item);
         /* set mode */
         item = gtk_menu_item_new_with_label (_("View"));
