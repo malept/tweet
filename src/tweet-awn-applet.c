@@ -27,6 +27,7 @@
 
 #include <libawn/awn-applet-dialog.h>
 #include <libawn/awn-applet-simple.h>
+#include <libawn/awn-config-client.h>
 
 #include "tweet-auth-dialog.h"
 #include "tweet-config.h"
@@ -37,10 +38,24 @@ typedef struct
   AwnAppletSimple *applet;
   GtkWidget       *vbox;
   GtkWidget       *dialog;
-/*AwnConfigClient *config;*/
+  AwnConfigClient *shared_config;
   GtkWidget       *menu;
   gboolean         dialog_shown;
 } TweetAwnApplet;
+
+static gboolean
+tweet_applet_dialog_on_focus_out (GtkWidget      *widget,
+                                  GdkEventFocus  *event,
+                                  TweetAwnApplet *tweet)
+{
+  if (awn_config_client_get_bool (tweet->shared_config,
+                                  AWN_CONFIG_CLIENT_DEFAULT_GROUP,
+                                  "dialog_focus_loss_behavior"))
+  {
+    gtk_widget_hide (widget);
+  }
+  return FALSE;
+}
 
 static void
 tweet_applet_create_vbox (TweetAwnApplet *tweet)
@@ -48,6 +63,8 @@ tweet_applet_create_vbox (TweetAwnApplet *tweet)
   tweet->dialog = awn_applet_dialog_new (AWN_APPLET (tweet->applet));
 
   gtk_window_set_default_size (GTK_WINDOW (tweet->dialog), TWEET_VBOX_WIDTH, 550);
+  g_signal_connect (G_OBJECT (tweet->dialog), "focus-out-event",
+                    G_CALLBACK (tweet_applet_dialog_on_focus_out), tweet);
 
   tweet->vbox = tweet_vbox_new ();
   TWEET_VBOX (tweet->vbox)->mode = TWEET_MODE_RECENT;
@@ -302,6 +319,8 @@ awn_applet_factory_initp (const gchar *uid, gint orient, gint height)
                                                              height, 0, NULL));
   g_signal_connect (G_OBJECT (tweet->applet), "button-press-event",
                     G_CALLBACK (tweet_applet_onclick), tweet);
+
+  tweet->shared_config = awn_config_client_new_for_applet ("shared", NULL);
 
   tweet->dialog = NULL;
   tweet->vbox = NULL;
