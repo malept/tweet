@@ -4,5 +4,6 @@ Encoding=UTF-8
 _Name=Tweet
 _Comment=A Clutter-based Twitter client
 Exec=@LIBDIR@/awn/applets/tweet/tweet-applet.so
-Icon=document-send
+Icon=tweet
 X-AWN-AppletType=C
+X-AWN-AppletCategory=GNOME;GTK;Network;InstantMessaging;
