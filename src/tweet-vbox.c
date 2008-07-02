@@ -45,6 +45,7 @@
 #include "tweet-animation.h"
 #include "tweet-canvas.h"
 #include "tweet-config.h"
+#include "tweet-hot-actor.h"
 #include "tweet-spinner.h"
 #include "tweet-status-info.h"
 #include "tweet-status-model.h"
@@ -81,6 +82,8 @@ struct _TweetVBoxPrivate
   guint nm_id;
   libnm_glib_state nm_state;
 #endif
+
+  GdkCursor *hot_cursor;
 };
 
 G_DEFINE_TYPE (TweetVBox, tweet_vbox, GTK_TYPE_VBOX);
@@ -114,6 +117,12 @@ tweet_vbox_dispose (GObject *gobject)
     {
       g_object_unref (priv->status_model);
       priv->status_model = NULL;
+    }
+
+  if (priv->hot_cursor)
+    {
+      gdk_cursor_unref (priv->hot_cursor);
+      priv->hot_cursor = NULL;
     }
 
 #ifdef HAVE_NM_GLIB
@@ -517,6 +526,39 @@ on_status_view_button_release (ClutterActor       *actor,
   return FALSE;
 }
 
+static gboolean
+on_stage_motion (ClutterStage       *stage,
+                 ClutterMotionEvent *event,
+                 TweetVBox          *vbox)
+{
+  GdkCursor *new_hot_cursor = NULL;
+  TweetVBoxPrivate *priv = vbox->priv;
+
+  if (TWEET_IS_HOT_ACTOR (event->source))
+    {
+      GdkDisplay *display = gtk_widget_get_display (priv->canvas);
+      new_hot_cursor
+        = tweet_hot_actor_get_cursor (TWEET_HOT_ACTOR (event->source),
+                                      display,
+                                      event->x, event->y);
+    }
+
+  if (new_hot_cursor != priv->hot_cursor)
+    {
+      if (new_hot_cursor)
+        gdk_cursor_ref (new_hot_cursor);
+
+      if (priv->hot_cursor)
+        gdk_cursor_unref (priv->hot_cursor);
+
+      priv->hot_cursor = new_hot_cursor;
+
+      gdk_window_set_cursor (priv->canvas->window, new_hot_cursor);
+    }
+
+  return FALSE;
+}
+
 inline void
 tweet_vbox_clear (TweetVBox *vbox)
 {
@@ -778,35 +820,7 @@ about_url_hook (GtkAboutDialog *dialog,
                 const gchar    *link_,
                 gpointer        user_data)
 {
-  GdkScreen *screen;
-  gint pid;
-  GError *error;
-  gchar **argv;
-
-  if (gtk_widget_has_screen (GTK_WIDGET (dialog)))
-    screen = gtk_widget_get_screen (GTK_WIDGET (dialog));
-  else
-    screen = gdk_screen_get_default ();
-
-  argv = g_new (gchar*, 3);
-  argv[0] = g_strdup ("xdg-open");
-  argv[1] = g_strdup (link_);
-  argv[2] = NULL;
-
-  error = NULL;
-  gdk_spawn_on_screen (screen,
-                       NULL,
-                       argv, NULL,
-                       G_SPAWN_SEARCH_PATH,
-                       NULL, NULL,
-                       &pid, &error);
-  if (error)
-    {
-      g_critical ("Unable to launch xdg-open: %s", error->message);
-      g_error_free (error);
-    }
-
-  g_strfreev (argv);
+  tweet_show_url (GTK_WIDGET (dialog), link_);
 }
 
 void
@@ -858,10 +872,23 @@ tweet_vbox_style_set (GtkWidget *widget,
                       GtkStyle  *old_style)
 {
   TweetVBoxPrivate *priv = TWEET_VBOX (widget)->priv;
+  GdkScreen *screen;
+  gdouble dpi;
   ClutterColor active_color = { 0, };
   ClutterColor text_color = { 0, };
   ClutterColor bg_color = { 0, };
   gchar *font_name;
+
+  if (gtk_widget_has_screen (widget))
+    screen = gtk_widget_get_screen (widget);
+  else
+    screen = gdk_screen_get_default ();
+
+  dpi = gdk_screen_get_resolution (screen);
+  if (dpi < 0)
+    dpi = 96.0;
+
+  clutter_backend_set_resolution (clutter_get_default_backend (), dpi);
 
   tweet_widget_get_base_color (widget, GTK_STATE_SELECTED, &active_color);
   tweet_widget_get_text_color (widget, GTK_STATE_NORMAL, &text_color);
@@ -1016,6 +1043,10 @@ tweet_vbox_init (TweetVBox *vbox)
   clutter_actor_set_size (stage,
                           canvas_req.width + TWEET_CANVAS_PADDING,
                           canvas_req.height + TWEET_CANVAS_PADDING);
+
+  g_signal_connect (stage, "motion-event",
+                    G_CALLBACK (on_stage_motion),
+                    vbox);
 
   view = tweet_status_view_new (priv->status_model);
   g_signal_connect (view,
