@@ -50,7 +50,8 @@ tweet_applet_dialog_on_focus_out (GtkWidget      *widget,
 {
   if (awn_config_client_get_bool (tweet->shared_config,
                                   AWN_CONFIG_CLIENT_DEFAULT_GROUP,
-                                  "dialog_focus_loss_behavior"))
+                                  "dialog_focus_loss_behavior",
+                                  NULL))
   {
     gtk_widget_hide (widget);
   }
