@@ -19,6 +19,7 @@ common_cflags = \
 	-I$(top_srcdir)/copy-and-paste \
 	$(TWEET_CFLAGS) \
 	$(NMGLIB_CFLAGS) \
+	$(GNOME_KEYRING_CFLAGS) \
 	$(NULL)
 
 common_ldadd = \
@@ -26,6 +27,7 @@ common_ldadd = \
 	$(top_builddir)/copy-and-paste/tidy/libtidy.la \
 	$(TWEET_LIBS) \
 	$(NMGLIB_LIBS) \
+	$(GNOME_KEYRING_LIBS) \
 	$(NULL)
 
 if BUILD_AWN_APPLET

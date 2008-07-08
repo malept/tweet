@@ -108,6 +108,18 @@ if test "x$enable_awn_applet" = "xyes"; then
 fi
 AM_CONDITIONAL([BUILD_AWN_APPLET], test "x$enable_awn_applet" = "xyes")
 
+AC_ARG_WITH([gnome-keyring],
+            AC_HELP_STRING([--with-gnome-keyring],
+                           [store the username/password via Gnome Keyring]),,
+            with_gnome_keyring=no)
+
+if test "x$with_gnome_keyring" = "xyes"; then
+  PKG_CHECK_MODULES(GNOME_KEYRING, [gnome-keyring-1 >= 2.21.3])
+  AC_SUBST(GNOME_KEYRING_CFLAGS)
+  AC_SUBST(GNOME_KEYRING_LIBS)
+  AC_DEFINE([USE_GNOME_KEYRING], 1, [Defined if Gnome Keyring support was enabled])
+fi
+
 dnl = Enable debug level ===================================================
 
 m4_define([debug_default],
@@ -198,4 +210,5 @@ echo "                 Prefix: ${prefix}"
 echo "            Debug level: ${enable_debug}"
 echo "         Compiler flags: ${CPPFLAGS}"
 echo " NetworkManager support: $has_nm_glib"
+echo "  Gnome Keyring support: $with_gnome_keyring"
 echo ""

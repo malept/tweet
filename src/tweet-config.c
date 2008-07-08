@@ -22,6 +22,7 @@
 
 #include <glib.h>
 #include <glib/gstdio.h>
+#include <glib/gi18n.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -29,6 +30,11 @@
 
 #include <json-glib/json-glib.h>
 #include <json-glib/json-gobject.h>
+
+#ifdef USE_GNOME_KEYRING
+#include <gnome-keyring.h>
+#include <gnome-keyring-memory.h>
+#endif
 
 #include "tweet-config.h"
 
@@ -49,7 +55,9 @@ enum
   PROP_0,
 
   PROP_USERNAME,
+#ifndef USE_GNOME_KEYRING
   PROP_PASSWORD,
+#endif
   PROP_REFRESH_TIME,
   PROP_USE_GTK_BG
 };
@@ -72,8 +80,13 @@ tweet_config_finalize (GObject *gobject)
 {
   TweetConfigPrivate *priv = TWEET_CONFIG (gobject)->priv;
 
+#ifdef USE_GNOME_KEYRING
+  gnome_keyring_memory_free (priv->username);
+  gnome_keyring_memory_free (priv->password);
+#else
   g_free (priv->username);
   g_free (priv->password);
+#endif
 
   G_OBJECT_CLASS (tweet_config_parent_class)->finalize (gobject);
 }
@@ -92,9 +105,11 @@ tweet_config_set_property (GObject      *gobject,
       tweet_config_set_username (config, g_value_get_string (value));
       break;
 
+#ifndef USE_GNOME_KEYRING
     case PROP_PASSWORD:
       tweet_config_set_password (config, g_value_get_string (value));
       break;
+#endif
 
     case PROP_REFRESH_TIME:
       tweet_config_set_refresh_time (config, g_value_get_int (value));
@@ -124,9 +139,11 @@ tweet_config_get_property (GObject    *gobject,
       g_value_set_string (value, priv->username);
       break;
 
+#ifndef USE_GNOME_KEYRING
     case PROP_PASSWORD:
       g_value_set_string (value, priv->password);
       break;
+#endif
 
     case PROP_REFRESH_TIME:
       g_value_set_int (value, priv->refresh_time);
@@ -160,6 +177,7 @@ tweet_config_class_init (TweetConfigClass *klass)
                                                         "Username",
                                                         NULL,
                                                         G_PARAM_READWRITE));
+#ifndef USE_GNOME_KEYRING
   g_object_class_install_property (gobject_class,
                                    PROP_PASSWORD,
                                    g_param_spec_string ("password",
@@ -167,6 +185,7 @@ tweet_config_class_init (TweetConfigClass *klass)
                                                         "Password",
                                                         NULL,
                                                         G_PARAM_READWRITE));
+#endif
   g_object_class_install_property (gobject_class,
                                    PROP_REFRESH_TIME,
                                    g_param_spec_int ("refresh-time",
@@ -201,6 +220,24 @@ tweet_config_init (TweetConfig *config)
   config->priv->refresh_time = 300;
   config->priv->use_gtk_bg = TRUE;
 }
+
+#ifdef USE_GNOME_KEYRING
+static void
+found_password (GnomeKeyringResult  result,
+                const gchar        *password,
+                TweetConfig        *config)
+{
+  if (result == GNOME_KEYRING_RESULT_OK)
+    {
+      tweet_config_set_password (config, password);
+    }
+  else
+    {
+      g_warning ("Unable to retrieve password: %s",
+                 gnome_keyring_result_to_message (result));
+    }
+}
+#endif
 
 TweetConfig *
 tweet_config_get_default (void)
@@ -241,6 +278,20 @@ tweet_config_get_default (void)
       if (!default_config)
         default_config = g_object_new (TWEET_TYPE_CONFIG, NULL);
 
+#ifdef USE_GNOME_KEYRING
+      TweetConfigPrivate *priv = TWEET_CONFIG_GET_PRIVATE (default_config);
+
+      gnome_keyring_find_password (GNOME_KEYRING_NETWORK_PASSWORD,
+                                   (GnomeKeyringOperationGetStringCallback)found_password,
+                                   default_config,
+                                   NULL,
+                                   "user", priv->username,
+                                   "server", "twitter.com",
+                                   "protocol", "http",
+                                   "port", 80,
+                                   NULL);
+#endif
+
       g_free (contents);
       g_free (filename);
     }
@@ -259,8 +310,13 @@ tweet_config_set_username (TweetConfig *config,
 
   priv = config->priv;
 
+#ifdef USE_GNOME_KEYRING
+  gnome_keyring_memory_free (priv->username);
+  priv->username = gnome_keyring_memory_strdup (username);
+#else
   g_free (priv->username);
   priv->username = g_strdup (username);
+#endif
 
   g_object_notify (G_OBJECT (config), "username");
 }
@@ -284,10 +340,15 @@ tweet_config_set_password (TweetConfig *config,
 
   priv = config->priv;
 
+#ifdef USE_GNOME_KEYRING
+  gnome_keyring_memory_free (priv->password);
+  priv->password = gnome_keyring_memory_strdup (password);
+#else
   g_free (priv->password);
   priv->password = g_strdup (password);
 
   g_object_notify (G_OBJECT (config), "password");
+#endif
 }
 
 G_CONST_RETURN gchar *
@@ -350,6 +411,18 @@ tweet_config_get_use_gtk_bg (TweetConfig *config)
   return config->priv->use_gtk_bg;
 }
 
+#ifdef USE_GNOME_KEYRING
+static void
+store_password_complete (GnomeKeyringResult result)
+{
+  if (result != GNOME_KEYRING_RESULT_OK)
+    {
+      g_warning ("Unable to save password: %s",
+                 gnome_keyring_result_to_message (result));
+    }
+}
+#endif
+
 void
 tweet_config_save (TweetConfig *config)
 {
@@ -394,6 +467,20 @@ tweet_config_save (TweetConfig *config)
                  "The configuration file is readable to everyone.",
                  g_strerror (errno));
     }
+
+#ifdef USE_GNOME_KEYRING
+  gnome_keyring_store_password (GNOME_KEYRING_NETWORK_PASSWORD, /* password type */
+                                GNOME_KEYRING_DEFAULT, /* keyring destination */
+                                _("Twitter account"), /* display name */
+                                tweet_config_get_password (config),
+                                (GnomeKeyringOperationDoneCallback)store_password_complete,
+                                NULL, NULL,
+                                "user", tweet_config_get_username (config),
+                                "server", "twitter.com",
+                                "protocol", "http",
+                                "port", 80,
+                                NULL);
+#endif
 
   g_free (buffer);
   g_free (filename);
