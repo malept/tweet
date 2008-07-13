@@ -8,7 +8,7 @@ tweetapp_in_files = tweet.desktop.in
 tweetapp_DATA = $(tweetapp_in_files:.desktop.in=.desktop)
 
 if BUILD_AWN_APPLET
-appletdatadir = $(libdir)/awn/applets
+appletdatadir = $(datadir)/avant-window-navigator/applets
 appletdata_in_files = tweet-applet.desktop.in
 appletdata_DATA = $(appletdata_in_files:.desktop.in=.desktop)
 endif
