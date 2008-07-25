@@ -221,24 +221,6 @@ tweet_config_init (TweetConfig *config)
   config->priv->use_gtk_bg = TRUE;
 }
 
-#ifdef USE_GNOME_KEYRING
-static void
-found_password (GnomeKeyringResult  result,
-                const gchar        *password,
-                TweetConfig        *config)
-{
-  if (result == GNOME_KEYRING_RESULT_OK)
-    {
-      tweet_config_set_password (config, password);
-    }
-  else
-    {
-      g_warning ("Unable to retrieve password: %s",
-                 gnome_keyring_result_to_message (result));
-    }
-}
-#endif
-
 TweetConfig *
 tweet_config_get_default (void)
 {
@@ -280,16 +262,38 @@ tweet_config_get_default (void)
 
 #ifdef USE_GNOME_KEYRING
       TweetConfigPrivate *priv = TWEET_CONFIG_GET_PRIVATE (default_config);
+      GnomeKeyringResult result;
+      GList *passwords = NULL;
 
-      gnome_keyring_find_password (GNOME_KEYRING_NETWORK_PASSWORD,
-                                   (GnomeKeyringOperationGetStringCallback)found_password,
-                                   default_config,
-                                   NULL,
-                                   "user", priv->username,
-                                   "server", "twitter.com",
-                                   "protocol", "http",
-                                   "port", 80,
-                                   NULL);
+      result =
+        gnome_keyring_find_network_password_sync (priv->username,
+                                                  NULL, /* domain */
+                                                  "twitter.com",
+                                                  NULL, /* object */
+                                                  "http",
+                                                  "basic",
+                                                  80,
+                                                  &passwords);
+      if (result == GNOME_KEYRING_RESULT_OK)
+        {
+          if (g_list_length (passwords) > 0)
+            {
+              GnomeKeyringNetworkPasswordData *data =
+                (GnomeKeyringNetworkPasswordData*)passwords->data;
+
+              tweet_config_set_password (default_config, data->password);
+            }
+          else
+            {
+              g_warning ("No password found.");
+            }
+           gnome_keyring_network_password_list_free (passwords);
+        }
+      else
+        {
+          g_warning ("Unable to retrieve password: %s",
+                     gnome_keyring_result_to_message (result));
+        }
 #endif
 
       g_free (contents);
@@ -413,7 +417,7 @@ tweet_config_get_use_gtk_bg (TweetConfig *config)
 
 #ifdef USE_GNOME_KEYRING
 static void
-store_password_complete (GnomeKeyringResult result)
+store_password_complete (GnomeKeyringResult result, guint32 value)
 {
   if (result != GNOME_KEYRING_RESULT_OK)
     {
@@ -469,17 +473,17 @@ tweet_config_save (TweetConfig *config)
     }
 
 #ifdef USE_GNOME_KEYRING
-  gnome_keyring_store_password (GNOME_KEYRING_NETWORK_PASSWORD, /* password type */
-                                GNOME_KEYRING_DEFAULT, /* keyring destination */
-                                _("Twitter account"), /* display name */
-                                tweet_config_get_password (config),
-                                (GnomeKeyringOperationDoneCallback)store_password_complete,
-                                NULL, NULL,
-                                "user", tweet_config_get_username (config),
-                                "server", "twitter.com",
-                                "protocol", "http",
-                                "port", 80,
-                                NULL);
+  gnome_keyring_set_network_password (GNOME_KEYRING_DEFAULT, /* keyring destination */
+                                      tweet_config_get_username (config),
+                                      NULL, /* domain */
+                                      "twitter.com",
+                                      NULL, /* object */
+                                      "http",
+                                      "basic",
+                                      80,
+                                      tweet_config_get_password (config),
+                                      (GnomeKeyringOperationGetIntCallback)store_password_complete,
+                                      NULL, NULL);
 #endif
 
   g_free (buffer);
