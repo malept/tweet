@@ -82,9 +82,7 @@ struct _TweetVBoxPrivate
   guint in_press : 1;
 
 #ifdef HAVE_NM_GLIB
-  libnm_glib_ctx *nm_context;
   guint nm_id;
-  libnm_glib_state nm_state;
 #endif
 
   GdkCursor *hot_cursor;
@@ -132,11 +130,11 @@ tweet_vbox_dispose (GObject *gobject)
 #ifdef HAVE_NM_GLIB
   if (priv->nm_id)
     {
-      libnm_glib_unregister_callback (priv->nm_context, priv->nm_id);
-      libnm_glib_shutdown (priv->nm_context);
+      libnm_glib_unregister_callback (vbox->nm_context, priv->nm_id);
+      libnm_glib_shutdown (vbox->nm_context);
 
       priv->nm_id = 0;
-      priv->nm_context = NULL;
+      vbox->nm_context = NULL;
     }
 #endif /* HAVE_NM_GLIB */
 
@@ -661,7 +659,7 @@ nm_context_callback (libnm_glib_ctx *libnm_ctx,
 
   nm_state = libnm_glib_get_network_state (libnm_ctx);
 
-  if (nm_state == priv->nm_state)
+  if (nm_state == vbox->nm_state)
     return;
 
   switch (nm_state)
@@ -700,7 +698,7 @@ nm_context_callback (libnm_glib_ctx *libnm_ctx,
       break;
     }
 
-  priv->nm_state = nm_state;
+  vbox->nm_state = nm_state;
 }
 #endif /* HAVE_NM_GLIB */
 
@@ -742,9 +740,9 @@ tweet_vbox_constructed (GObject *gobject)
   gtk_widget_show_all (GTK_WIDGET (vbox));
 
 #ifdef HAVE_NM_GLIB
-  priv->nm_context = libnm_glib_init ();
+  vbox->nm_context = libnm_glib_init ();
 
-  nm_state = libnm_glib_get_network_state (priv->nm_context);
+  nm_state = libnm_glib_get_network_state (vbox->nm_context);
   if (nm_state == LIBNM_ACTIVE_NETWORK_CONNECTION)
     {
       const gchar *email_address;
@@ -779,8 +777,8 @@ tweet_vbox_constructed (GObject *gobject)
                                 priv->spinner);
     }
 
-  priv->nm_state = nm_state;
-  priv->nm_id = libnm_glib_register_callback (priv->nm_context,
+  vbox->nm_state = nm_state;
+  priv->nm_id = libnm_glib_register_callback (vbox->nm_context,
                                               nm_context_callback,
                                               vbox,
                                               NULL);

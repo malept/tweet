@@ -57,6 +57,10 @@ struct _TweetWindowPrivate
 
   GtkUIManager *manager;
   GtkActionGroup *action_group;
+
+#ifdef HAVE_NM_GLIB
+  guint nm_id;
+#endif
 };
 
 G_DEFINE_TYPE (TweetWindow, tweet_window, GTK_TYPE_WINDOW);
@@ -83,6 +87,16 @@ tweet_window_dispose (GObject *gobject)
       g_object_unref (priv->action_group);
       priv->action_group = NULL;
     }
+
+#ifdef HAVE_NM_GLIB
+  if (priv->nm_id)
+    {
+      TweetVBox *vbox = TWEET_VBOX (priv->vbox);
+      libnm_glib_unregister_callback (vbox->nm_context, priv->nm_id);
+
+      priv->nm_id = 0;
+    }
+#endif /* HAVE_NM_GLIB */
 
   G_OBJECT_CLASS (tweet_window_parent_class)->dispose (gobject);
 }
@@ -220,7 +234,7 @@ nm_context_callback (libnm_glib_ctx *libnm_ctx,
 
   nm_state = libnm_glib_get_network_state (libnm_ctx);
 
-  if (nm_state == priv->nm_state)
+  if (nm_state == TWEET_VBOX (priv->vbox)->nm_state)
     return;
 
   switch (nm_state)
@@ -244,27 +258,26 @@ tweet_window_constructed (GObject *gobject)
 {
   TweetWindow *window = TWEET_WINDOW (gobject);
   TweetWindowPrivate *priv = window->priv;
+  TweetVBox *vbox = TWEET_VBOX (priv->vbox);
 #ifdef HAVE_NM_GLIB
-  libnm_glib_state nm_state;
-
-  priv->nm_context = libnm_glib_init ();
-
-  nm_state = libnm_glib_get_network_state (priv->nm_context);
-  if (nm_state == LIBNM_ACTIVE_NETWORK_CONNECTION)
+  if (vbox->nm_state == LIBNM_ACTIVE_NETWORK_CONNECTION)
     {
-      g_signal_connect (TWEET_VBOX (priv->vbox)->client,
+      g_signal_connect (vbox->client,
                         "user-received", G_CALLBACK (on_user_received),
                         window);
     }
   else
     {
-      TweetAnimation *animation;
-
       tweet_window_status_message (window, TWEET_STATUS_NO_CONNECTION,
                                    _("No network connection available"));
     }
+
+  priv->nm_id = libnm_glib_register_callback (vbox->nm_context,
+                                              nm_context_callback,
+                                              window,
+                                              NULL);
 #else
-    g_signal_connect (TWEET_VBOX (priv->vbox)->client,
+    g_signal_connect (vbox->client,
                       "user-received", G_CALLBACK (on_user_received),
                       window);
 #endif /* HAVE_NM_GLIB */

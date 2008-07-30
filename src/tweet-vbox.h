@@ -22,6 +22,9 @@
 
 #include <gtk/gtkvbox.h>
 #include "twitter-client.h"
+#ifdef HAVE_NM_GLIB
+#include <libnm_glib.h>
+#endif
 #include "tweet-canvas.h"
 #include "tweet-config.h"
 
@@ -62,6 +65,11 @@ struct _TweetVBox
   gint n_status_received;
 
   guint refresh_id;
+
+#ifdef HAVE_NM_GLIB
+  libnm_glib_ctx *nm_context;
+  libnm_glib_state nm_state;
+#endif
 };
 
 struct _TweetVBoxClass
