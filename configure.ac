@@ -86,11 +86,22 @@ PKG_CHECK_MODULES(TWEET,
 AC_SUBST(TWEET_CFLAGS)
 AC_SUBST(TWEET_LIBS)
 
-PKG_CHECK_MODULES(NMGLIB, libnm_glib,
-                  [has_nm_glib=yes],
-                  [han_nm_glib=no])
-AC_SUBST(NMGLIB_CFLAGS)
-AC_SUBST(NMGLIB_LIBS)
+AC_ARG_WITH([networkmanager],
+            AC_HELP_STRING([--with-networkmanager=[yes|no|auto]],
+                           [build with NetworkManager support (defaults to auto-detect)]),,
+            with_networkmanager=auto)
+
+if test "x$with_networkmanager" != "xno"; then
+  PKG_CHECK_MODULES(NMGLIB, libnm_glib, [has_nm_glib=yes],[
+    if test "x$with_networkmanager" = "xyes"; then
+      AC_MSG_ERROR([libnm_glib (NetworkManager GLib library) is required for building.])
+    else
+      has_nm_glib=no
+    fi
+  ])
+  AC_SUBST(NMGLIB_CFLAGS)
+  AC_SUBST(NMGLIB_LIBS)
+fi
 
 if test "x$has_nm_glib" = "xyes"; then
   AC_DEFINE([HAVE_NM_GLIB], [1], [Define to 1 if we have NM-GLib support])
