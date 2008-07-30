@@ -767,6 +767,8 @@ tweet_vbox_constructed (GObject *gobject)
     }
   else
     {
+      TweetAnimation *animation;
+
       tweet_spinner_stop (TWEET_SPINNER (priv->spinner));
       animation =
         tweet_actor_animate (priv->spinner, TWEET_LINEAR, 500,
