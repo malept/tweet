@@ -1077,7 +1077,7 @@ tweet_vbox_init (TweetVBox *vbox)
 
 #ifdef HAVE_SPELLCHECK
   priv->entry = sexy_spell_entry_new ();
-  sexy_spell_entry_set_checked (priv->entry, TRUE);
+  sexy_spell_entry_set_checked (SEXY_SPELL_ENTRY (priv->entry), TRUE);
 #else
   priv->entry = gtk_entry_new ();
 #endif
