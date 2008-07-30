@@ -43,6 +43,7 @@ typedef struct
   gboolean         dialog_shown;
 } TweetAwnApplet;
 
+#ifndef HAVE_SPELLCHECK
 static gboolean
 tweet_applet_dialog_on_focus_out (GtkWidget      *widget,
                                   GdkEventFocus  *event,
@@ -57,6 +58,7 @@ tweet_applet_dialog_on_focus_out (GtkWidget      *widget,
   }
   return FALSE;
 }
+#endif
 
 static void
 tweet_applet_create_vbox (TweetAwnApplet *tweet)
@@ -64,8 +66,10 @@ tweet_applet_create_vbox (TweetAwnApplet *tweet)
   tweet->dialog = awn_applet_dialog_new (AWN_APPLET (tweet->applet));
 
   gtk_window_set_default_size (GTK_WINDOW (tweet->dialog), TWEET_VBOX_WIDTH, 550);
+#ifndef HAVE_SPELLCHECK
   g_signal_connect (G_OBJECT (tweet->dialog), "focus-out-event",
                     G_CALLBACK (tweet_applet_dialog_on_focus_out), tweet);
+#endif
 
   tweet->vbox = tweet_vbox_new ();
   TWEET_VBOX (tweet->vbox)->mode = TWEET_MODE_RECENT;

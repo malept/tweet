@@ -120,6 +120,18 @@ if test "x$with_gnome_keyring" = "xyes"; then
   AC_DEFINE([USE_GNOME_KEYRING], 1, [Defined if Gnome Keyring support was enabled])
 fi
 
+AC_ARG_ENABLE([spellcheck],
+              AC_HELP_STRING([--enable-spellcheck],
+                             [Enable spellcheck support]),,
+              enable_spellcheck=no)
+
+if test "x$enable_spellcheck" = "xyes"; then
+  PKG_CHECK_MODULES(LIBSEXY, [libsexy])
+  AC_SUBST(LIBSEXY_CFLAGS)
+  AC_SUBST(LIBSEXY_LIBS)
+  AC_DEFINE([HAVE_SPELLCHECK], [1], [Define to 1 if we have libsexy support])
+fi
+
 dnl = Enable debug level ===================================================
 
 m4_define([debug_default],

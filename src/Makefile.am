@@ -20,6 +20,7 @@ common_cflags = \
 	$(TWEET_CFLAGS) \
 	$(NMGLIB_CFLAGS) \
 	$(GNOME_KEYRING_CFLAGS) \
+	$(LIBSEXY_CFLAGS) \
 	$(NULL)
 
 common_ldadd = \
@@ -28,6 +29,7 @@ common_ldadd = \
 	$(TWEET_LIBS) \
 	$(NMGLIB_LIBS) \
 	$(GNOME_KEYRING_LIBS) \
+	$(LIBSEXY_LIBS) \
 	$(NULL)
 
 if BUILD_AWN_APPLET

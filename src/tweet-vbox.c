@@ -42,6 +42,10 @@
 
 #include <twitter-glib/twitter-glib.h>
 
+#ifdef HAVE_SPELLCHECK
+#include <libsexy/sexy-spell-entry.h>
+#endif
+
 #include "tweet-animation.h"
 #include "tweet-canvas.h"
 #include "tweet-config.h"
@@ -1071,7 +1075,12 @@ tweet_vbox_init (TweetVBox *vbox)
   gtk_box_pack_end (GTK_BOX (vbox), hbox, FALSE, FALSE, 0);
   gtk_widget_show (hbox);
 
+#ifdef HAVE_SPELLCHECK
+  priv->entry = sexy_spell_entry_new ();
+  sexy_spell_entry_set_checked (priv->entry, TRUE);
+#else
   priv->entry = gtk_entry_new ();
+#endif
   gtk_box_pack_start (GTK_BOX (hbox), priv->entry, TRUE, TRUE, 0);
   gtk_widget_set_tooltip_text (priv->entry, "Update your status");
   gtk_widget_show (priv->entry);
