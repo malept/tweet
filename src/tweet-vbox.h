@@ -21,7 +21,7 @@
 #define __TWEET_VBOX_H__
 
 #include <gtk/gtkvbox.h>
-#include "twitter-client.h"
+#include <twitter-glib/twitter-client.h>
 #ifdef HAVE_NM_GLIB
 #include <libnm_glib.h>
 #endif

@@ -1,4 +1,4 @@
-SUBDIRS = twitter-glib tests copy-and-paste src po data
+SUBDIRS = copy-and-paste src po data
 
 EXTRA_DIST = 			\
 	NEWS 			\

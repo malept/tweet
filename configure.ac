@@ -17,7 +17,6 @@ m4_define([lt_age],
 
 m4_define([glib_req_version], [2.16])
 m4_define([json_glib_req_version], [0.6.0])
-m4_define([soup_req_version], [2.4.1])
 m4_define([clutter_req_version], [0.6.2])
 m4_define([gtk_req_version], [2.12])
 m4_define([clutter_gtk_req_version], [0.6.1])
@@ -58,25 +57,9 @@ AC_SUBST(TWEET_MICRO_VERSION)
 AC_SUBST(TWEET_MINOR_VERSION)
 AC_SUBST(TWEET_VERSION)
 
-dnl twitter-glib checks
-LIBT_CURRENT=lt_current
-LIBT_REVISION=lt_revision
-LIBT_AGE=lt_age
-LIBT_VERSION="$LIBT_CURRENT:$LIBT_REVISION:$LIBT_AGE"
-TWITTER_GLIB_LT_LDFLAGS="-version-info $LIBT_VERSION"
-AC_SUBST(TWITTER_GLIB_LT_LDFLAGS)
-
-PKG_CHECK_MODULES(TWITTER_GLIB,
-                  gobject-2.0 >= glib_req_version dnl
-                  gio-2.0 >= glib_req_version dnl
-                  json-glib-1.0 >= json_glib_req_version dnl
-                  libsoup-2.4 >= soup_req_version dnl
-                  gdk-pixbuf-2.0)
-AC_SUBST(TWITTER_GLIB_CFLAGS)
-AC_SUBST(TWITTER_GLIB_LIBS)
-
 dnl tweet checks
 PKG_CHECK_MODULES(TWEET,
+                  twitter-glib-1.0 dnl
                   gobject-2.0 >= glib_req_version dnl
                   json-glib-1.0 >= json_glib_req_version dnl
                   clutter-0.6 >= clutter_req_version dnl
@@ -198,13 +181,9 @@ AS_AC_EXPAND(LIBDIR, "$libdir")
 
 AC_CONFIG_FILES([
         Makefile
-        twitter-glib/Makefile
-        twitter-glib/twitter-version.h
-        twitter-glib/twitter-glib.pc
         copy-and-paste/Makefile
         copy-and-paste/tidy/Makefile
         src/Makefile
-        tests/Makefile
         po/Makefile.in
         data/Makefile
         data/icons/Makefile
