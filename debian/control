@@ -1,0 +1,71 @@
+Source: tweet
+Section: misc
+Priority: extra
+Maintainer: Mark Lee <launchpad-net@lazymalevolence.com>
+Build-Depends:	cdbs,
+		debhelper (>= 7),
+		gnome-common,
+		automake | automaken,
+		gnome-doc-utils,
+		libglib2.0-dev (>= 2.16.0),
+		libjson-glib-dev (>= 0.6.0),
+		libtwitter-glib-dev,
+		libgtk2.0-dev (>= 2.12.0),
+		libclutter-0.6-dev (>= 0.6.2),
+		libclutter-cairo-0.6-dev (>= 0.6.2),
+		libclutter-gtk-0.6-dev (>= 0.6.1),
+		libnm-glib-dev,
+		libawn-dev-trunk | libawn-dev (>> 0.2.9),
+		libgnome-keyring-dev (>= 2.21.3),
+		libsexy-dev,
+Standards-Version: 3.8.0
+Homepage: http://live.gnome.org/Tweet
+
+Package: tweet-data
+Architecture: all
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: A simple desktop client for the Twitter messaging service.
+ Tweet uses Clutter as an hardware accelerated canvas for parts of its user
+ interface; this requires a working OpenGL implementation.
+ .
+ This package provides the common application data for the Tweet interfaces.
+
+Package: tweet
+Architecture: any
+Depends:    ${shlibs:Depends},
+	    ${misc:Depends},
+	    tweet-data,
+	    libglib2.0-0 (>= 2.16.0),
+	    libjson-glib-1.0-0 (>= 0.6.0),
+	    libtwitter-glib-1.0-0,
+	    libgtk2.0-0 (>= 2.12.0),
+	    libclutter-0.6-0 (>= 0.6.2),
+	    libclutter-cairo-0.6-0 (>= 0.6.2),
+	    libclutter-gtk-0.6-0 (>= 0.6.1),
+	    libnm-glib0,
+	    libgnome-keyring0 (>= 2.21.3),
+	    libsexy2,
+Description: A simple desktop client for the Twitter messaging service.
+ Tweet uses Clutter as an hardware accelerated canvas for parts of its user
+ interface; this requires a working OpenGL implementation.
+
+Package: awn-applet-tweet
+Architecture: any
+Depends:    ${shlibs:Depends},
+	    ${misc:Depends},
+	    tweet-data,
+	    libglib2.0-0 (>= 2.16.0),
+	    libjson-glib-1.0-0 (>= 0.6.0),
+	    libtwitter-glib-1.0-0,
+	    libgtk2.0-0 (>= 2.12.0),
+	    libclutter-0.6-0 (>= 0.6.2),
+	    libclutter-cairo-0.6-0 (>= 0.6.2),
+	    libclutter-gtk-0.6-0 (>= 0.6.1),
+	    libnm-glib0,
+	    libgnome-keyring0 (>= 2.21.3),
+	    libsexy2,
+	    libawn0-trunk | libawn-dev (>> 0.2.9)
+Recommends: avant-window-navigator-trunk | avant-window-navigator
+Description: An Avant Window Navigator applet for Twitter.
+ Tweet uses Clutter as an hardware accelerated canvas for parts of its user
+ interface; this requires a working OpenGL implementation.
